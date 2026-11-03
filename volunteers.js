@@ -125,7 +125,7 @@ function appendVolunteerContacts(parent, volunteer, dateIso, emailParent) {
     var button = el('button', 'volunteer-contact contact-toggle'); button.type = 'button';
     button.setAttribute('aria-label', 'Contact ' + volunteer.name); button.setAttribute('title', 'Contact ' + volunteer.name);
     button.setAttribute('aria-expanded', 'false');
-    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="10" cy="9" r="2.5"/><path d="M5 18v-1a5 5 0 0 1 10 0v1M17 8h2M17 12h2M17 16h2"/></svg>';
+    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="10" cy="9" r="2.5"/><path d="M5 18v-1a5 5 0 0 1 10 0v1M17 8h2M17 12h2M17 16h2"/></svg>';
     menu = el('span', 'contact-menu'); menu.id = 'volunteer-contact-' + (++volunteerContactSequence); menu.hidden = true;
     menu.setAttribute('popover', 'manual'); menu.setAttribute('role', 'group'); menu.setAttribute('aria-label', 'Contact ' + volunteer.name);
     button.setAttribute('aria-controls', menu.id);
