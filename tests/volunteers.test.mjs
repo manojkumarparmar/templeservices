@@ -128,3 +128,15 @@ test('Google sign-in checks signature, audience, expiry, and nonce', async () =>
   for (const invalid of [{ aud: 'wrong' }, { exp: 1 }, { nonce: 'wrong' }, { email_verified: false }]) await assert.rejects(() => makeJwt(invalid).then(jwt => verifyGoogle(jwt, 'test-client', 'test-nonce', fetcher)));
   const jwt = await makeJwt(); await assert.rejects(() => verifyGoogle(jwt.slice(0, -8) + 'AAAAAAAA', 'test-client', 'test-nonce', fetcher));
 });
+
+
+test('sign-in lookup matches active emails and normalized phones without returning profile details', async () => {
+  const {db,call} = fixture({anonymous:true});
+  db.prepare('UPDATE volunteers SET phone=? WHERE id=?').run('+12145550123','ajinkya');
+  assert.deepEqual(await (await call('auth/lookup',{identifier:'SUPER@example.com'})).json(),{found:true,kind:'email'});
+  assert.deepEqual(await (await call('auth/lookup',{identifier:'(214) 555-0123'})).json(),{found:true,kind:'phone'});
+  assert.deepEqual(await (await call('auth/lookup',{identifier:'missing@example.com'})).json(),{found:false,kind:'email'});
+  db.prepare('UPDATE volunteers SET active=0 WHERE id=?').run('ajinkya');
+  assert.deepEqual(await (await call('auth/lookup',{identifier:'2145550123'})).json(),{found:false,kind:'phone'});
+  assert.equal((await call('auth/lookup',{identifier:'abc'})).status,400);
+});

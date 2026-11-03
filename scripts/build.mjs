@@ -2,6 +2,8 @@ import { mkdir, copyFile, writeFile } from 'node:fs/promises';
 const root = new URL('../', import.meta.url);
 const dist = new URL('dist/', root);
 await mkdir(dist, { recursive: true });
+await mkdir(new URL('assets/', dist), { recursive: true });
+await copyFile(new URL('assets/radha-kalachandji.jpg', root), new URL('assets/radha-kalachandji.jpg', dist));
 await copyFile(new URL('index.html', root), new URL('index.html', dist));
 await copyFile(new URL('volunteers.js', root), new URL('volunteers.js', dist));
 await copyFile(new URL('phone-auth.js', root), new URL('phone-auth.js', dist));

@@ -9,6 +9,9 @@ function requireSignIn() {
 async function openSignIn() {
   var dialog = document.getElementById('auth-dialog');
   if (!dialog.open) dialog.showModal();
+  document.getElementById('signin-lookup').hidden = false;
+  document.getElementById('signin-methods').hidden = true;
+  document.getElementById('signin-help').hidden = true;
   var status = document.getElementById('auth-status'); status.textContent = 'Loading sign-in options…';
   try {
     loginConfig = await api('auth/config');
@@ -18,21 +21,9 @@ async function openSignIn() {
     phoneConfirmation = null; resetPhoneChallenge();
     document.getElementById('email-start').hidden = !loginConfig.emailEnabled;
     document.getElementById('email-verify').hidden = true;
-    var googleBox = document.getElementById('google-sign-in'); googleBox.textContent = '';
-    if (loginConfig.googleClientId) {
-      if (!window.google || !window.google.accounts) {
-        await new Promise(function (resolve, reject) {
-          var script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true; script.onload = resolve; script.onerror = reject; document.head.appendChild(script);
-        });
-      }
-      google.accounts.id.initialize({ client_id: loginConfig.googleClientId, nonce: loginConfig.nonce, callback: async function (response) {
-        status.textContent = 'Signing in…';
-        try { var result = await api('auth/google', { credential: response.credential }); await signedIn(result.user); }
-        catch (error) { status.textContent = error.message; }
-      } });
-      google.accounts.id.renderButton(googleBox, { theme: 'outline', size: 'large', text: 'continue_with' });
-    }
-    status.textContent = loginConfig.googleClientId || loginConfig.emailEnabled || loginConfig.firebase ? '' : 'Volunteer sign-in is not available yet. Please contact the coordinator.';
+    document.getElementById('google-sign-in').hidden = true;
+    document.getElementById('email-start').hidden = true;
+    status.textContent = loginConfig.firebase ? '' : 'Phone sign-in is unavailable. Please contact your coordinator.';
   } catch (error) { status.textContent = error.message; }
 }
 function updateAccount() {
@@ -187,6 +178,44 @@ function volunteerForm(volunteer, close) {
 async function initPeople() {
   initRecurring();
   initPhoneSignIn();
+  document.getElementById('signin-change').addEventListener('click', function () {
+    document.getElementById('signin-methods').hidden = true;
+    document.getElementById('signin-lookup').hidden = false;
+    document.getElementById('signin-help').hidden = true;
+    document.getElementById('auth-status').textContent = '';
+    phoneConfirmation = null; resetPhoneChallenge();
+  });
+  document.getElementById('signin-lookup').addEventListener('submit', async function (event) {
+    event.preventDefault();
+    var button = event.target.querySelector('button'); if (button.disabled) return;
+    var identifier = document.getElementById('signin-identifier').value.trim();
+    if (!/^(?:\+?1[\s.-]?)?\(?[2-9]\d{2}\)?[\s.-]?[2-9]\d{2}[\s.-]?\d{4}$/.test(identifier)) { document.getElementById('auth-status').textContent = 'Enter a valid US mobile number with area code.'; return; }
+    var status = document.getElementById('auth-status');
+    button.disabled = true; status.textContent = 'Checking your sign-in details…';
+    document.getElementById('signin-help').hidden = true;
+    document.getElementById('signin-methods').hidden = true;
+    try {
+      var match = await api('auth/lookup', {identifier:identifier});
+      if (!match.found) {
+        status.textContent = (match.kind === 'phone' ? 'Phone number' : 'Email') + ' not found in an active volunteer profile. Ask an administrator to add or correct it before trying again.';
+        document.getElementById('signin-help').hidden = false;
+        return;
+      }
+      if (!loginConfig) loginConfig = await api('auth/config');
+      document.getElementById('signin-lookup').hidden = true;
+      document.getElementById('signin-methods').hidden = false;
+      document.getElementById('google-sign-in').hidden = true;
+      document.getElementById('email-start').hidden = true;
+      document.getElementById('email-verify').hidden = true;
+      document.getElementById('phone-sign-in').hidden = match.kind !== 'phone' || !loginConfig.firebase;
+      document.getElementById('phone-start').hidden = false;
+      document.getElementById('phone-verify').hidden = true;
+      document.getElementById('auth-email').value = identifier;
+      document.getElementById('auth-phone').value = identifier;
+      status.textContent = match.kind === 'phone' ? (loginConfig.firebase ? 'Phone found. Send a text code to continue.' : 'Phone sign-in is unavailable. Please contact your coordinator.') : (loginConfig.googleClientId || loginConfig.emailEnabled ? 'Email found. Choose a sign-in method below.' : 'Email sign-in is unavailable. Try your registered phone or contact your coordinator.');
+    } catch (error) { status.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
   ['volunteer-search', 'volunteer-role', 'volunteer-day', 'volunteer-sort'].forEach(function (id) {
     document.getElementById(id).addEventListener(id === 'volunteer-search' ? 'input' : 'change', renderVolunteers);
   });

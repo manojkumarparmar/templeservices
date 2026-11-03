@@ -20,7 +20,7 @@ function phoneError(error) {
   var messages = {
     'auth/invalid-phone-number':'Enter a valid US mobile number with area code.',
     'auth/invalid-verification-code':'That code is incorrect. Please try again.',
-    'auth/code-expired':'That code expired. Please request a new code.',
+    'auth/code-expired':'That code has expired or was already used. Request a new code and use only the latest text message. If this keeps happening, ask an administrator to confirm your phone number is saved on your active volunteer profile.',
     'auth/too-many-requests':'Too many attempts. Please wait before trying again.',
     'auth/quota-exceeded':'SMS sign-in is temporarily unavailable. Please use Google or email.',
     'auth/captcha-check-failed':'Please complete the verification challenge again.',
@@ -58,11 +58,21 @@ function initPhoneSignIn() {
     try {
       var result = await phoneConfirmation.confirm(document.getElementById('phone-code').value.trim());
       var token = await result.user.getIdToken();
+      // A confirmed Firebase code cannot be reused if the profile lookup fails.
+      phoneConfirmation = null;
       var session = await api('auth/phone', {idToken:token});
       phoneConfirmation = null;
       document.getElementById('phone-code').value = '';
       await signedIn(session.user);
-    } catch (error) { status.textContent = phoneError(error); }
+    } catch (error) {
+      status.textContent = phoneError(error);
+      if (!phoneConfirmation || error.code === 'auth/code-expired') {
+        phoneConfirmation = null;
+        document.getElementById('phone-verify').hidden = true;
+        document.getElementById('phone-start').hidden = false;
+        document.getElementById('phone-code').value = '';
+      }
+    }
     finally { if (phoneAuth) await phoneSdk.signOut(phoneAuth); button.disabled = false; }
   });
   document.getElementById('change-phone').addEventListener('click', function () {

@@ -6,17 +6,17 @@
 <title>Temple Laundry Schedule</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap">
 <style>
 :root {
-  --bg: #f3f5f8;
-  --surface: #ffffff;
-  --fg: #16203a;
-  --muted: #4f5b78;
-  --line: #dde2ec;
-  --accent: #27408b;
+  --bg: #faf7ef;
+  --surface: #fffefb;
+  --fg: #342a22;
+  --muted: #75695a;
+  --line: #e6ddcc;
+  --accent: #a44919;
   --on-accent: #ffffff;
-  --today-bg: #eef2ff;
+  --today-bg: #fff2d8;
   --warn-bg: #fff4dc;
   --warn-fg: #7a4b00;
   --warn-line: #d9962b;
@@ -24,31 +24,10 @@
   --away-fg: #9c2f22;
   --cover-bg: #e3f3ea;
   --cover-fg: #1b6b43;
-  --field: #7c879f;
-  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --field: #a99b83;
+  --font-display: "Cormorant Garamond", "Avenir Next", "Segoe UI", sans-serif;
   --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1424;
-    --surface: #182038;
-    --fg: #eaeefb;
-    --muted: #a3aecd;
-    --line: #2a3556;
-    --accent: #9db4ff;
-    --on-accent: #0f1424;
-    --today-bg: #1d2a54;
-    --warn-bg: #3a2c0f;
-    --warn-fg: #ffd58c;
-    --warn-line: #e3a94a;
-    --away-bg: #3d1a17;
-    --away-fg: #ffb4a8;
-    --cover-bg: #12301f;
-    --cover-fg: #8fdcae;
-    --field: #8a97b8;
-    color-scheme: dark;
-  }
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -212,14 +191,93 @@ h2, h3 { margin: 0; }
 .volunteer-protected { color: var(--muted); font-size: 13px; }
 dialog { width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: var(--fg); }
 dialog::backdrop { background: #101a35a0; }
+.signin-help { margin-top: 16px; padding: 14px; border: 1px solid var(--warn-line); border-radius: 10px; background: var(--warn-bg); color: var(--fg); font-size: 14px; }
+.signin-help h3 { font-size: 16px; margin: 0; }
+.signin-help p { margin: 8px 0; }
+.signin-help summary { cursor: pointer; padding: 10px 0; font-weight: 600; }
 dialog .form, #google-sign-in { margin-top: 18px; }
 dialog .auth-heading h2 { font-size: 22px; }
 .btn-small:disabled { opacity: 0.55; cursor: default; }
+
+/* Modern Devotional: shared presentation for every existing workflow. */
+body { padding-top: 0; background: radial-gradient(ellipse at top right, #f7e8c9 0, transparent 42%), var(--bg); }
+.wrap { max-width: 1080px; gap: 22px; }
+.head { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 6px 24px; padding: 30px 0 22px 72px; border-bottom: 1px solid #c5a15b; }
+.header-deities { position: absolute; left: 0; top: 28px; width: 58px; height: 64px; object-fit: cover; object-position: 51% 28%; border: 1px solid #c5a15b; border-radius: 29px 29px 9px 9px; }
+.head .eyebrow { grid-column: 1; color: #8a642d; font-size: 10px; letter-spacing: .17em; }
+h1 { grid-column: 1; font-size: clamp(34px, 6vw, 46px); font-weight: 600; }
+.account-bar { grid-column: 2; grid-row: 1 / 3; margin: 0; justify-content: flex-end; max-width: 260px; }
+.main-tabs { display: flex; gap: 24px; padding: 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.main-tab { border-radius: 0; background: transparent; min-height: 52px; padding: 12px 8px; color: var(--muted); border-bottom: 3px solid transparent; }
+.main-tab[aria-selected="true"] { background: transparent; color: var(--accent); border-bottom-color: var(--accent); }
+.note:empty, #volunteers-status:empty, #account-label:empty { display: none; }
+.section-intro { display: flex; flex-direction: column; gap: 3px; }
+.section-intro h2, .directory-heading > h2 { font-family: var(--font-display); font-size: 32px; font-weight: 600; }
+.section-intro p { margin: 0; color: var(--muted); font-size: 14px; }
+.days { gap: 12px; }
+.day { border-radius: 12px; padding: 18px 20px; gap: 14px; box-shadow: 0 2px 6px #5d421004; }
+.day.is-today { border: 1px solid #be8a37; padding: 18px 20px; box-shadow: inset 4px 0 #ba7128; }
+.day-head { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.day-name { font-size: 25px; font-weight: 600; }
+.day-date { margin-left: 2px; }
+.pill { margin-left: auto; background: #a44919; font-size: 10px; padding: 4px 10px; }
+.who { font-size: 15px; }
+.shift .label { color: #927039; letter-spacing: .12em; }
+.btn-small, .btn-outline, .btn-primary { border-radius: 8px; font-size: 14px; transition: background .15s; }
+.btn-small, .btn-outline { border-color: #ccb991; }
+.btn-small:hover, .btn-outline:hover { background: var(--today-bg); }
+.btn-primary:hover:not(:disabled) { background: #843811; }
+.panel, .backups, .directory-controls, .volunteer-card { border-radius: 12px; padding: 20px; }
+.panel h2, .backups h2 { color: #8a642d; }
+.backup-area { margin-top: 22px; padding-top: 0; border: 0; }
+.backup { background: #f7f0df; color: #785522; }
+.volunteer-card h3 { font-size: 27px; font-weight: 600; }
+.directory-controls { background: #f4eddf; }
+.assignment-list li { background: #f7f0df; }
+.chip.note-kind { background: #f4ead5; color: #805a24; }
+.load-form { background: #fffcf5; padding: 18px; }
+.load-checks { padding: 12px 8px; background: var(--surface); }
+.load-checks legend { color: #805a24; }
+.check-label:has(input:checked) { background: #eef3e7; border-radius: 6px; color: #3e5d32; }
+dialog { box-shadow: 0 20px 80px #342a2233; }
+dialog::backdrop { background: #342a2266; }
+a { color: var(--accent); }
+.site-footer { display: flex; justify-content: space-between; gap: 16px; padding: 24px 0 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+@media (max-width: 600px) {
+ .head { padding: 22px 0 18px 54px; gap: 5px 10px; }
+ .header-deities { top: 24px; width: 42px; height: 48px; border-radius: 21px 21px 7px 7px; }
+ .head .eyebrow { font-size: 9px; letter-spacing: .08em; }
+ h1 { font-size: 34px; }
+ .account-bar { grid-column: 1 / -1; grid-row: auto; max-width: none; margin-top: 8px; }
+ .main-tabs { gap: 0; justify-content: space-between; }
+ .main-tab { flex: 1; font-size: 14px; }
+ .day, .day.is-today, .panel, .backups, .volunteer-card { padding: 16px; }
+ .shift-header { flex-wrap: wrap; }
+ .shift-actions { max-width: 100%; }
+ .site-footer { flex-direction: column; gap: 6px; }
+}
+
+@media (prefers-color-scheme: dark) {
+ :root:not([data-theme="light"]) {
+  --bg: #211c17; --surface: #2c251e; --fg: #f6efdf; --muted: #c4b69e;
+  --line: #514432; --accent: #efb275; --on-accent: #291b10; --today-bg: #3d301d;
+  --warn-bg: #3d3018; --warn-fg: #f6cd80; --warn-line: #c49343;
+  --away-bg: #421f1d; --away-fg: #ffb4a8; --cover-bg: #24351e; --cover-fg: #b5d49e; --field: #9e8b6d;
+  color-scheme: dark;
+ }
+ body { background: var(--bg); }
+ .head .eyebrow, .panel h2, .backups h2, .shift .label, .load-checks legend { color: #d2ac70; }
+ .directory-controls, .load-form, .assignment-list li, .backup, .chip.note-kind { background: var(--surface); color: var(--fg); }
+ .pill { color: #fff; }
+ .check-label:has(input:checked) { background: var(--cover-bg); color: var(--cover-fg); }
+ .btn-primary:hover:not(:disabled) { background: #ffc38a; }
+}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="head">
+    <img class="header-deities" src="assets/radha-kalachandji.jpg" width="64" height="64" alt="Sri Sri Radha Kalachandji" fetchpriority="high">
     <div class="eyebrow">Sri Radha Kalachandji Temple</div>
     <h1>Laundry Service</h1>
     <div class="account-bar"><span id="account-label"></span><button class="btn-small" type="button" id="sign-in">Sign in</button><button class="btn-small" type="button" id="sign-out" hidden>Sign out</button></div>
@@ -232,6 +290,7 @@ dialog .auth-heading h2 { font-size: 22px; }
   </nav>
 
   <div class="tab-panel" id="schedule-panel" role="tabpanel" aria-labelledby="schedule-tab">
+  <div class="section-intro"><h2>Your week of seva</h2><p>A little care, offered together.</p></div>
   <div class="directory-heading"><div class="range" id="range"></div><button type="button" class="btn-small" id="view-history" hidden>View past shifts</button></div>
   <section class="panel" id="history-panel" aria-labelledby="history-title" hidden>
     <div class="directory-heading"><h2 id="history-title">Past shifts</h2><button type="button" class="btn-small" id="close-history">Back to schedule</button></div>
@@ -270,6 +329,7 @@ dialog .auth-heading h2 { font-size: 22px; }
 
   </div>
   <div class="tab-panel" id="instructions-panel" role="tabpanel" aria-labelledby="instructions-tab" hidden>
+  <div class="section-intro"><h2>Service guidance</h2><p>Care for every load. Support the next volunteer.</p></div>
   <aside style="padding:20px; border:2px solid var(--warn-line); border-radius:14px; background:var(--warn-bg); color:var(--warn-fg);" aria-labelledby="instructions-progress-title">
     <h2 id="instructions-progress-title" style="font-size:22px;">Work in progress</h2>
     <p style="margin:8px 0 0;">This instructions page is still being prepared. Please check with your coordinator for current service guidance.</p>
@@ -293,19 +353,36 @@ dialog .auth-heading h2 { font-size: 22px; }
     <div class="volunteer-grid" id="volunteer-list"></div>
   </div>
 
+<footer class="site-footer"><span>Sri Radha Kalachandji Temple · Laundry seva</span><a href="/privacy.html">Privacy information</a></footer>
 </div>
 
 <dialog id="auth-dialog" aria-labelledby="auth-title">
   <div class="auth-heading"><h2 id="auth-title">Volunteer sign-in</h2><button class="btn-outline" type="button" id="auth-close">Close</button></div>
-  <p class="note">Use the email or phone number on your volunteer record. Only approved volunteers can submit updates.</p>
+  <p class="note">Use the US mobile number on your volunteer record. Only approved volunteers can submit updates.</p>
   <div id="google-sign-in"></div>
+  <form id="signin-lookup" class="form"><label class="field">US mobile number<input id="signin-identifier" type="tel" autocomplete="tel" placeholder="(214) 555-0123" maxlength="30" required></label><button class="btn-primary" type="submit">Continue</button></form>
+  <aside class="signin-help" id="signin-help" aria-labelledby="signin-help-title" hidden>
+    <h3 id="signin-help-title">Phone number not found</h3>
+    <p>Ask an administrator to add your US mobile number to your active volunteer profile first. Having your name on the schedule does not mean your sign-in number has been added.</p>
+    <details><summary>No code, or unable to sign in?</summary>
+      <p>If no text arrives, check the number and ask your administrator to confirm it is saved on your profile. Repeatedly requesting codes will not fix a missing profile number.</p>
+      <p>If a code expires, request a new one and enter only the latest text code. If it still fails, contact your coordinator with the exact error message. Never share your code.</p>
+    </details>
+    <details><summary>My availability or assignment is incorrect</summary>
+      <p>You do not need to sign in to ask for a correction. Contact your coordinator with the date you are available from and the shifts that need changing. A coordinator or administrator can update assignments; an administrator can update profile availability notes.</p>
+      <p>Signing in does not give volunteers permission to edit their own profile or recurring assignments. Use Need backup on your assigned upcoming shift if temporary cover is needed.</p>
+    </details>
+  </aside>
+  <div id="signin-methods" hidden>
+  <button type="button" class="btn-outline" id="signin-change">Use another phone number</button>
   <form id="email-start" class="form" hidden><label class="field">Email<input id="auth-email" type="email" autocomplete="email" maxlength="254" required></label><button class="btn-primary" type="submit">Send email code</button></form>
   <form id="email-verify" class="form" hidden><label class="field">Six-digit code<input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="btn-primary" type="submit">Verify and sign in</button><button class="btn-outline" id="change-email" type="button">Use another email</button></form>
   <section id="phone-sign-in" hidden aria-label="Phone sign-in">
     <form id="phone-start" class="form"><label class="field">US mobile number<input id="auth-phone" type="tel" autocomplete="tel" placeholder="(214) 555-0123" maxlength="30" required></label><p class="note">By choosing Send text code, you agree to receive a sign-in text. Message and data rates may apply. Google processes your phone number for verification and abuse prevention. See our privacy information below.</p><div id="phone-recaptcha"></div><button class="btn-primary" type="submit">Send text code</button></form>
     <form id="phone-verify" class="form" hidden><label class="field">Six-digit text code<input id="phone-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><button class="btn-primary" type="submit">Verify phone and sign in</button><button class="btn-outline" id="change-phone" type="button">Use another number or resend</button></form>
   </section>
-  <p class="note" id="auth-status" role="status"></p>
+  </div>
+  <p class="note" id="auth-status" role="status" aria-live="polite" aria-atomic="true"></p>
   <p class="note"><a href="/privacy.html" target="_blank" rel="noopener">Privacy information</a></p>
 </dialog>
 <script src="phone-auth.js"></script>
@@ -667,12 +744,16 @@ function renderLoadNotes(dateIso, shiftKey, actions, allowNotes) {
     });
     form.appendChild(group);
   });
-  var textLabel = el("label", "field", "Notes (optional)");
+  var textLabel = el("label", "field", "Common shift notes (optional)");
   var text = el("textarea"); text.rows = 3; text.maxLength = 1000; text.placeholder = "Anything the next volunteer should know?";
   textLabel.appendChild(text); form.appendChild(textLabel);
-  var photoLabel = el("label", "field", "Photos (optional)");
+  var photoLabel = el("label", "field", "Shift photos (optional)");
   var file = el("input"); file.type = "file"; file.accept = "image/*"; file.multiple = true;
   photoLabel.appendChild(file); form.appendChild(photoLabel);
+  var camera = el("input"); camera.type = "file"; camera.accept = "image/*"; camera.setAttribute("capture", "environment"); camera.className = "sr"; camera.tabIndex = -1;
+  var cameraButton = el("button", "btn-outline", "Take photo"); cameraButton.type = "button";
+  cameraButton.addEventListener("click", function () { camera.click(); });
+  photoLabel.appendChild(camera); form.appendChild(cameraButton);
   var previews = el("div", "photo-row"); form.appendChild(previews);
   var photos = [], processing = false, saving = false, draftId = null, editingEntry = null;
   form.addEventListener("input", function () { if (!saving) draftId = null; });
@@ -739,17 +820,20 @@ function renderLoadNotes(dateIso, shiftKey, actions, allowNotes) {
       holder.appendChild(image); holder.appendChild(remove); previews.appendChild(holder);
     });
   }
-  file.addEventListener("change", async function () {
-    if (photos.length + file.files.length > 4) { status.textContent = "Attach up to four photos per update."; file.value = ""; return; }
-    draftId = null; processing = true; submit.disabled = true; file.disabled = true; status.textContent = "Preparing photos…";
+  async function preparePhotos(source) {
+    if (processing || saving) return;
+    if (photos.length + source.files.length > 4) { status.textContent = "Attach up to four photos per update."; source.value = ""; return; }
+    draftId = null; processing = true; submit.disabled = true; file.disabled = true; cameraButton.disabled = true; status.textContent = "Preparing photos…";
     var failures = 0;
-    for (var selected of Array.from(file.files || [])) {
+    for (var selected of Array.from(source.files || [])) {
       var url = await new Promise(function (resolve) { downscale(selected, resolve); });
       if (url) photos.push(url); else failures++;
     }
-    showPhotos(); file.value = ""; file.disabled = false; processing = false; submit.disabled = false;
+    showPhotos(); source.value = ""; file.disabled = false; cameraButton.disabled = false; processing = false; submit.disabled = false;
     status.textContent = failures ? "Some photos could not be read. Please try them again." : "";
-  });
+  }
+  file.addEventListener("change", function () { return preparePhotos(file); });
+  camera.addEventListener("change", function () { return preparePhotos(camera); });
   form.addEventListener("submit", async function (event) {
     event.preventDefault(); if (processing || saving) return;
     var loads = {}, any = false;

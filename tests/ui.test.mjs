@@ -286,3 +286,19 @@ test('signed-in history is read only, supports week navigation, and clears on si
   assert.equal(nodes['history-days'].children.length,0);
   assert.equal(nodes['current-schedule'].hidden,false);
 });
+
+
+test('verified phone with an unmatched profile resets the consumed code instead of retrying it', async () => {
+  const {nodes,context} = await fixture();
+  context.phoneConfirmation = {confirm: async () => ({user:{getIdToken:async ()=>'test-token'}})};
+  context.api = async () => { throw new Error('Your phone was verified, but it is not linked to an active volunteer profile.'); };
+  const target = new Element('form'); const button = new Element('button'); target.appendChild(button);
+  nodes['phone-code'].value = '123456'; nodes['phone-start'].hidden = true;
+  await nodes['phone-verify'].events.submit({preventDefault(){},target});
+  assert.equal(context.phoneConfirmation,null);
+  assert.equal(nodes['phone-verify'].hidden,true);
+  assert.equal(nodes['phone-start'].hidden,false);
+  assert.equal(nodes['phone-code'].value,'');
+  assert.match(nodes['auth-status'].text,/not linked to an active volunteer profile/);
+  assert.equal(button.disabled,false);
+});

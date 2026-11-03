@@ -169,6 +169,15 @@ export async function handlePeople(request, env, url, data, user) {
   if (request.method !== 'POST') return null;
   if (path === '/api/recurring/save') return saveRecurringSchedule(data, user, env);
   if (path.startsWith('/api/auth/')) fail(JSON.stringify(data).length > 16000, 413, 'Sign-in request too large.');
+  if (path === '/api/auth/lookup') {
+    await limitAuth(request, env);
+    const raw = typeof data.identifier === 'string' ? data.identifier.trim() : '';
+    const kind = raw.includes('@') ? 'email' : 'phone';
+    const value = kind === 'email' ? cleanEmail(raw) : normalizePhone(raw);
+    fail(!value || (kind === 'email' && !validEmail(value)), 400, 'Enter a valid email address or US mobile number.');
+    const row = await env.DB.prepare(kind === 'email' ? 'SELECT id FROM volunteers WHERE email=? AND active=1' : 'SELECT id FROM volunteers WHERE phone=? AND active=1').bind(value).first();
+    return reply({found:!!row, kind});
+  }
   if (path === '/api/auth/email/start') return sendCode(data, request, env);
   if (path === '/api/auth/email/verify') return checkCode(data, request, env);
   if (path === '/api/auth/phone') {
@@ -178,7 +187,7 @@ export async function handlePeople(request, env, url, data, user) {
     try { claims = await verifyFirebasePhone(data.idToken, config.projectId); }
     catch { throw new AuthError(401, 'Phone sign-in could not be verified. Please request a new code.'); }
     const row = await env.DB.prepare('SELECT * FROM volunteers WHERE phone=? AND active=1').bind(claims.phone_number).first();
-    fail(!row, 403, 'Please ask an administrator to add your phone number to your volunteer record.');
+    fail(!row, 403, 'Your phone was verified, but it is not linked to an active volunteer profile. Ask an administrator to add or correct your phone number and confirm your profile is active, then request a new code.');
     return startSession(row, env);
   }
   if (path === '/api/auth/google') {
