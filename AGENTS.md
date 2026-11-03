@@ -25,3 +25,5 @@ Read `PROJECT_MEMORY.md` for the complete November 1, 2026 session record, deplo
 - Volunteer contacts (November 3, 2026): the existing Volunteers tab displays phone/email and call, SMS and email links to every signed-in active volunteer. Anonymous, expired and inactive sessions receive no contact fields. Profile editing remains administrator-only. This supersedes historical admin-only contact visibility in PROJECT_MEMORY.md. No opt-in or privacy toggles.
 
 - Contact links also appear beside names in current/upcoming shifts, backup coverage, Permanent backups, recurring assignments (including editor choices), and current shift note authors. Never show contacts for dated schedules/notes before today or anywhere in History. Match IDs where available; omit ambiguous name matches.
+
+- All contact actions use icon-only call and SMS links with accessible names and tooltips, rather than displaying phone numbers or an SMS text label. Email links retain their address text. Phone numbers remain editable in administrator forms.

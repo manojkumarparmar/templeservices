@@ -309,6 +309,10 @@ test('existing volunteer cards show contact actions only while signed in and cle
   context.renderVolunteers();
   let links=find(nodes['volunteer-list'],n=>n.tag==='a');
   assert.deepEqual(links.map(n=>n.href),['tel:+12145550123','sms:+12145550123','mailto:sample@example.com']);
+  assert.equal(links[0].text,undefined); assert.equal(links[1].text,undefined);
+  assert.match(links[0].innerHTML,/<svg/); assert.match(links[1].innerHTML,/<svg/);
+  assert.equal(links[0].attrs['aria-label'],'Call Sample Mtj');
+  assert.equal(links[1].attrs['aria-label'],'Send SMS to Sample Mtj');
   assert.equal(buttons(nodes['volunteer-list'],'Edit volunteer').length,0);
   // Sign-out succeeds, but the subsequent roster refresh fails.
   const originalApi=context.api;
