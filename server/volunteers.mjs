@@ -164,7 +164,7 @@ export async function handlePeople(request, env, url, data, user) {
   }
   if (request.method === 'GET' && path === '/api/volunteers') {
     const rows = await env.DB.prepare('SELECT * FROM volunteers ORDER BY is_super_admin DESC, name COLLATE NOCASE').all();
-    return reply({ volunteers: rows.results.filter(r => r.active || isAdmin(user)).map(row => profile(row, isAdmin(user))), roles: ROLES });
+    return reply({ volunteers: rows.results.filter(r => r.active || isAdmin(user)).map(row => profile(row, !!user)), roles: ROLES });
   }
   if (request.method !== 'POST') return null;
   if (path === '/api/recurring/save') return saveRecurringSchedule(data, user, env);

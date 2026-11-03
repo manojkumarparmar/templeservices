@@ -153,3 +153,22 @@ test('profile saves and removals succeed when D1 counts schedule-history trigger
   assert.equal((await call('volunteers/remove',{id:updated.id,version:updated.version})).status,200);
   assert.equal(db.prepare('SELECT active FROM volunteers WHERE id=?').get(updated.id).active,0);
 });
+
+test('contacts require an active session while editing remains administrator-only', async () => {
+  const {db,call}=fixture({userId:'hema-sirasha'});
+  db.prepare('UPDATE volunteers SET email=?,phone=? WHERE id=?').run('swetha@example.com','+12145550123','swetha');
+  const response=await call('volunteers');
+  assert.equal(response.headers.get('Cache-Control'),'no-store');
+  const person=(await response.json()).volunteers.find(v=>v.id==='swetha');
+  assert.equal(person.email,'swetha@example.com'); assert.equal(person.phone,'+12145550123');
+  assert.equal((await call('volunteers/save',{...person,name:'Changed'})).status,403);
+  async function hidden(cookie) {
+    const people=(await (await call('volunteers',undefined,undefined,cookie)).json()).volunteers;
+    assert.ok(people.every(v=>!('email' in v) && !('phone' in v)));
+  }
+  await hidden(''); await hidden('tls_session='+'b'.repeat(64));
+  db.prepare('UPDATE auth_sessions SET expires_at=0').run(); await hidden('tls_session='+'a'.repeat(64));
+  db.prepare('UPDATE auth_sessions SET expires_at=?').run(Math.floor(Date.now()/1000)+3600);
+  db.prepare('UPDATE volunteers SET active=0 WHERE id=?').run('hema-sirasha');
+  await hidden('tls_session='+'a'.repeat(64));
+});

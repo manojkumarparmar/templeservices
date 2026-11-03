@@ -21,3 +21,5 @@ Read `PROJECT_MEMORY.md` for the complete November 1, 2026 session record, deplo
 
 
 - Historical assignments are versioned in schedule_versions via migration 0006 (already applied in production). Recurring/profile changes affect today/future only; resolve past assignments from dated versions, never current volunteer records. History requires sign-in and is read only. See PROJECT_MEMORY.md for pre-version unknown dates and retention behavior.
+
+- Volunteer contacts (November 3, 2026): the existing Volunteers tab displays phone/email and call, SMS and email links to every signed-in active volunteer. Anonymous, expired and inactive sessions receive no contact fields. Profile editing remains administrator-only. This supersedes historical admin-only contact visibility in PROJECT_MEMORY.md. No opt-in or privacy toggles.

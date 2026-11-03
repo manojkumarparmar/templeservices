@@ -34,6 +34,7 @@ function updateAccount() {
   document.getElementById('add-volunteer').hidden = !managesVolunteers();
   if (!managesVolunteers()) closeNewVolunteer();
   renderRecurring();
+  renderVolunteers();
 }
 function closeNewVolunteer() {
   var box = document.getElementById('new-volunteer'); box.textContent = ''; box.hidden = true;
@@ -98,8 +99,20 @@ function renderVolunteers() {
       availability.appendChild(el('div', 'label', 'Availability'));
       availability.appendChild(el('p', 'note', volunteer.availabilityNotes));
     }
-    if (managesVolunteers() && volunteer.email) identity.appendChild(el('p', 'note', volunteer.email));
-    if (managesVolunteers() && volunteer.phone) identity.appendChild(el('p', 'note', volunteer.phone));
+    if (currentUser) {
+      var contacts = el('div', 'volunteer-contacts');
+      function contactLink(label, href, action) {
+        var link = el('a', 'volunteer-contact', label); link.href = href;
+        link.setAttribute('aria-label', action + ' ' + volunteer.name);
+        contacts.appendChild(link);
+      }
+      if (volunteer.phone) {
+        contactLink(volunteer.phone, 'tel:' + volunteer.phone, 'Call');
+        contactLink('SMS', 'sms:' + volunteer.phone, 'Send SMS to');
+      }
+      if (volunteer.email) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
+      if (contacts.children.length) identity.appendChild(contacts);
+    }
     var canEdit = managesVolunteers() && (!volunteer.isSuperAdmin || currentUser.isSuperAdmin);
     if (volunteer.isSuperAdmin) card.appendChild(el('p', 'volunteer-protected', 'Protected super-admin · role cannot be removed.'));
     if (canEdit) {
@@ -124,8 +137,8 @@ function volunteerForm(volunteer, close) {
     input.value = value; input.maxLength = max; label.appendChild(input); form.appendChild(label); return input;
   }
   var name = inputField('Name', 'text', original.name, 60); name.required = true;
-  var email = inputField('Sign-in email (visible only to administrators)', 'email', original.email || '', 254);
-  var phone = inputField('US mobile number (visible only to administrators)', 'tel', original.phone || '', 30);
+  var email = inputField('Sign-in email (visible to signed-in volunteers)', 'email', original.email || '', 254);
+  var phone = inputField('US mobile number (visible to signed-in volunteers)', 'tel', original.phone || '', 30);
   var availability = inputField('Availability notes (visible to everyone)', 'textarea', original.availabilityNotes, 1000);
   var roles = el('fieldset'); roles.appendChild(el('legend', null, 'Roles')); var roleBox = el('div', 'role-choices'); roles.appendChild(roleBox); form.appendChild(roles);
   var roleInputs = {};

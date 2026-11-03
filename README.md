@@ -20,8 +20,8 @@ button for the full week. Each shift offers existing active volunteers, includin
 multiple selections or no assignment. **Save recurring schedule** saves the entire
 week to D1 and returns to the read-only table, updating the rolling schedule and
 volunteer directory. **Cancel** discards edits. Concurrent changes are rejected
-without partially saving the week. Coordinators gain assignment editing only;
-private contact information and volunteer role management remain admin-only.
+without partially saving the week. Coordinators gain assignment editing only.
+Contact information is visible to all signed-in active volunteers and hidden from signed-out visitors. Volunteer role management remains admin-only.
 
 Open `index.html` and edit the block marked `EDIT THIS SECTION TO UPDATE THE SCHEDULE`:
 
@@ -149,7 +149,7 @@ in source. Other volunteers need their email added by an administrator before si
 
 Phone authentication uses Firebase only for SMS verification. D1 remains the source of
 volunteer identity, roles and application sessions; R2 remains photo storage. Numbers
-are private to administrators. Enter a number on the person's volunteer form before
+are visible to signed-in active volunteers. Enter a number on the person's volunteer form before
 they sign in. Unlisted and inactive volunteers cannot obtain an application session.
 
 Setup:

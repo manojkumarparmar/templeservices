@@ -302,3 +302,18 @@ test('verified phone with an unmatched profile resets the consumed code instead 
   assert.match(nodes['auth-status'].text,/not linked to an active volunteer profile/);
   assert.equal(button.disabled,false);
 });
+
+test('existing volunteer cards show contact actions only while signed in and clear them before a failed refresh', async () => {
+  const {nodes,context,setFail}=await fixture();
+  context.volunteerDirectory=[{id:'person',name:'Sample Mtj',phone:'+12145550123',email:'sample@example.com',roles:['volunteer'],assignments:[],availabilityNotes:'',active:true}];
+  context.renderVolunteers();
+  let links=find(nodes['volunteer-list'],n=>n.tag==='a');
+  assert.deepEqual(links.map(n=>n.href),['tel:+12145550123','sms:+12145550123','mailto:sample@example.com']);
+  assert.equal(buttons(nodes['volunteer-list'],'Edit volunteer').length,0);
+  // Sign-out succeeds, but the subsequent roster refresh fails.
+  const originalApi=context.api;
+  context.api=async (path,data)=>{ if(path==='auth/logout') { setFail(true); return {}; } return originalApi(path,data); };
+  await nodes['sign-out'].events.click();
+  assert.equal(context.currentUser,null);
+  assert.equal(find(nodes['volunteer-list'],n=>n.tag==='a').length,0);
+});
