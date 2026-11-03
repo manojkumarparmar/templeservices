@@ -35,6 +35,7 @@ function updateAccount() {
   if (!managesVolunteers()) closeNewVolunteer();
   renderRecurring();
   renderVolunteers();
+  renderPermanentBackups(); render();
 }
 function closeNewVolunteer() {
   var box = document.getElementById('new-volunteer'); box.textContent = ''; box.hidden = true;
@@ -54,15 +55,41 @@ function applyVolunteerSchedule() {
     });
     return plan;
   });
+  renderPermanentBackups();
+}
+function renderPermanentBackups() {
   var backups = volunteerDirectory.filter(function (v) { return v.active && v.roles.indexOf('backup') >= 0; });
   var box = document.getElementById('backup-list'); box.textContent = '';
   if (!backups.length) box.appendChild(el('p', 'note', 'No permanent backups listed yet.'));
-  backups.forEach(function (v) { box.appendChild(el('div', 'backup', v.name)); });
+  backups.forEach(function (v) { var item = el('div', 'backup'); item.appendChild(volunteerIdentity(v.name, v.id)); box.appendChild(item); });
 }
 async function refreshVolunteers() {
   var data = await api('volunteers'); volunteerDirectory = data.volunteers;
   applyVolunteerSchedule(); renderVolunteers();
+  sharedListeners.forEach(function (listener) { listener(); });
   if (!recurringDraft) renderRecurring();
+}
+function appendVolunteerContacts(parent, volunteer, dateIso) {
+  if (!currentUser || !volunteer || (dateIso && dateIso < iso(templeToday()))) return;
+  var contacts = el('div', 'volunteer-contacts');
+  function contactLink(label, href, action) {
+    var link = el('a', 'volunteer-contact', label); link.href = href;
+    link.setAttribute('aria-label', action + ' ' + volunteer.name);
+    contacts.appendChild(link);
+  }
+  if (volunteer.phone) {
+    contactLink(volunteer.phone, 'tel:' + volunteer.phone, 'Call');
+    contactLink('SMS', 'sms:' + volunteer.phone, 'Send SMS to');
+  }
+  if (volunteer.email) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
+  if (contacts.children.length) parent.appendChild(contacts);
+}
+function volunteerIdentity(name, id, dateIso) {
+  var node = el('span', 'volunteer-identity');
+  node.appendChild(el('span', null, name));
+  var matches = volunteerDirectory.filter(function (v) { return v.active && (id ? v.id === id : v.name === name); });
+  if (matches.length === 1) appendVolunteerContacts(node, matches[0], dateIso);
+  return node;
 }
 function renderVolunteers() {
   var list = document.getElementById('volunteer-list'); list.textContent = '';
@@ -100,18 +127,7 @@ function renderVolunteers() {
       availability.appendChild(el('p', 'note', volunteer.availabilityNotes));
     }
     if (currentUser) {
-      var contacts = el('div', 'volunteer-contacts');
-      function contactLink(label, href, action) {
-        var link = el('a', 'volunteer-contact', label); link.href = href;
-        link.setAttribute('aria-label', action + ' ' + volunteer.name);
-        contacts.appendChild(link);
-      }
-      if (volunteer.phone) {
-        contactLink(volunteer.phone, 'tel:' + volunteer.phone, 'Call');
-        contactLink('SMS', 'sms:' + volunteer.phone, 'Send SMS to');
-      }
-      if (volunteer.email) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
-      if (contacts.children.length) identity.appendChild(contacts);
+      appendVolunteerContacts(identity, volunteer);
     }
     var canEdit = managesVolunteers() && (!volunteer.isSuperAdmin || currentUser.isSuperAdmin);
     if (volunteer.isSuperAdmin) card.appendChild(el('p', 'volunteer-protected', 'Protected super-admin · role cannot be removed.'));

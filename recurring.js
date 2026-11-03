@@ -17,7 +17,8 @@ function renderRecurring() {
       var cell = el('td');
       if (!editing) {
         var names = volunteerDirectory.filter(function (v) { return v.active && v.assignments.some(function (a) { return a.weekday === weekday && a.shift === shift; }); }).map(function (v) { return v.name; });
-        cell.textContent = names.join(', ') || 'Unassigned';
+        if (!names.length) cell.textContent = 'Unassigned';
+        names.forEach(function (name) { var person = el('div'); person.appendChild(volunteerIdentity(name)); cell.appendChild(person); });
         if (!names.length) cell.className = 'note';
       } else {
         var picker = el('details', 'recurring-picker');
@@ -37,6 +38,7 @@ function renderRecurring() {
             updateSummary();
           });
           label.appendChild(input); label.appendChild(document.createTextNode(v.name)); choices.appendChild(label);
+          var contact = el('div'); var person = volunteerDirectory.find(function (p) { return p.id === v.id; }); appendVolunteerContacts(contact, person); choices.appendChild(contact);
         });
         cell.appendChild(picker);
       }

@@ -317,3 +317,32 @@ test('existing volunteer cards show contact actions only while signed in and cle
   assert.equal(context.currentUser,null);
   assert.equal(find(nodes['volunteer-list'],n=>n.tag==='a').length,0);
 });
+
+test('contact actions cover current schedules, backups, recurring assignments and notes, excluding every past date', async () => {
+  const {nodes,context}=await fixture();
+  const today=context.iso(context.templeToday()), yesterday=context.iso(context.addDays(context.templeToday(),-1));
+  const person={id:'contact',name:'Contact Mtj',phone:'+12145550123',email:'contact@example.com',roles:['volunteer','backup'],assignments:[{weekday:0,shift:'am'}],availabilityNotes:'',active:true};
+  context.volunteerDirectory=[person];
+  const links=node=>find(node,n=>n.tag==='a');
+  context.applyVolunteerSchedule(); context.renderRecurring();
+  assert.equal(links(nodes['backup-list']).length,3);
+  assert.equal(links(nodes['recurring-body']).length,3);
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,3);
+  assert.equal(links(context.renderScheduledShift(yesterday,'am',[person.name],today)).length,0);
+  const entry={who:person.name,volunteerId:person.id,date:today,time:new Date().toISOString()};
+  assert.equal(links(context.renderUpdate(entry)).length,3);
+  assert.equal(links(context.renderUpdate({...entry,date:yesterday})).length,0);
+  assert.equal(links(context.renderUpdate(entry,true)).length,0);
+  context.sharedBackups[today+':am']={person:person.name,cover:'Another Mtj',coveredBy:'other'};
+  context.volunteerDirectory.push({...person,id:'other',name:'Another Mtj'});
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,6);
+  // Ambiguous names must not accidentally expose another person's contact information.
+  context.volunteerDirectory.push({...person,id:'duplicate'});
+  assert.equal(links(context.volunteerIdentity(person.name)).length,0);
+  assert.equal(links(context.volunteerIdentity(person.name,person.id)).length,3);
+  context.currentUser=null; context.updateAccount();
+  assert.equal(links(nodes['backup-list']).length,0);
+  assert.equal(links(nodes['recurring-body']).length,0);
+  assert.equal(links(nodes.days).length,0);
+  assert.equal(links(context.renderUpdate(entry)).length,0);
+});

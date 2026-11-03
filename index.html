@@ -178,7 +178,7 @@ h2, h3 { margin: 0; }
 .volunteer-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); min-width: 0; }
 .volunteer-card h3 { font-family: var(--font-display); font-size: 22px; overflow-wrap: anywhere; }
 .volunteer-card p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.volunteer-contacts { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.volunteer-contacts { font-size: 14px; font-weight: 400; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .volunteer-contact { min-height: 44px; display: inline-flex; align-items: center; color: var(--accent); overflow-wrap: anywhere; max-width: 100%; }
 .volunteer-contact:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .volunteer-roles, .assignment-list, .editor-actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -528,7 +528,8 @@ function renderShift(dateIso, shiftKey, people) {
   var notes = [];
   people.forEach(function (p, i) {
     var abs = absencesFor(dateIso, shiftKey, p);
-    var span = el("span", abs.length ? "gone" : "", p);
+    var span = volunteerIdentity(p, null, dateIso);
+    if (abs.length) span.className += " gone";
     if (i > 0) who.appendChild(document.createTextNode(" & "));
     who.appendChild(span);
     if (abs.length) {
@@ -546,6 +547,7 @@ function renderShift(dateIso, shiftKey, people) {
     box.appendChild(el("span", "chip away", "Away"));
     if (covers.length) box.appendChild(el("span", "chip cover", covers.join(" & ") + " covering"));
     else if (allAway) box.appendChild(el("span", "chip need", "Needs cover"));
+    if (dateIso >= iso(templeToday())) covers.forEach(function (name) { box.appendChild(volunteerIdentity(name, null, dateIso)); });
     notes.forEach(function (n) { box.appendChild(el("div", "note", n)); });
   }
 
@@ -637,6 +639,10 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
         details.appendChild(el("span", "chip need", "Needs backup"));
         details.appendChild(el("div", "backup-message", request.person + (request.wasBackup ? " (backup volunteer) is unavailable. Another backup is needed." : " is unavailable. A backup volunteer is needed.")));
       }
+      if (dateIso >= todayIso) {
+        var referenced = [request.person].concat(request.cover ? people : []);
+        referenced.filter(function (name, index) { return displayedPeople.indexOf(name) < 0 && referenced.indexOf(name) === index; }).forEach(function (name) { details.appendChild(volunteerIdentity(name, null, dateIso)); });
+      }
       if (request.notes) details.appendChild(el("div", "note", request.notes));
     }
     if (!currentUser || dateIso < todayIso) return;
@@ -692,7 +698,7 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
 var LOADS = [["kitchen", "Kitchen load"], ["pujari", "Pujari load"], ["deity", "Deity load"]];
 var STAGES = [["washed", "Washed"], ["dried", "Dried"], ["folded", "Folded"]];
 function loadUpdates() { return sharedUpdates; }
-function renderUpdate(entry) {
+function renderUpdate(entry, hideContacts) {
   var card = el("div", "entry");
   var head = el("div", "entry-head");
   head.appendChild(el("span", "entry-who", entry.who || "Volunteer"));
@@ -700,6 +706,10 @@ function renderUpdate(entry) {
   if (entry.updatedAt) head.appendChild(el('span', 'note', 'Edited'));
   if (entry.kind === "question") head.appendChild(el("span", "chip need", "Question"));
   card.appendChild(head);
+  if (!hideContacts && entry.date >= iso(templeToday())) {
+    var author = volunteerDirectory.find(function (v) { return v.active && v.id === entry.volunteerId; });
+    appendVolunteerContacts(card, author, entry.date);
+  }
   if (entry.loads) LOADS.forEach(function (load) {
     var row = el("div", "load-summary");
     row.appendChild(el("strong", null, load[1]));
@@ -935,7 +945,7 @@ async function loadHistory() {
           (backup.history || []).forEach(function (entry) { box.appendChild(el('div','note',entry.cover ? entry.cover+' previously covered for '+entry.person+'.' : entry.person+' previously requested backup.')); });
         }
         var entries = data.updates.filter(function(u){return u.date===day && u.shift===shift;});
-        entries.forEach(function(entry){box.appendChild(renderUpdate(entry));});
+        entries.forEach(function(entry){box.appendChild(renderUpdate(entry, true));});
         if (!entries.length) box.appendChild(el('div','note','No notes recorded.'));
         card.appendChild(box);
       });
