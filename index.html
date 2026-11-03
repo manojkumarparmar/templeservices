@@ -262,6 +262,54 @@ a { color: var(--accent); }
  .site-footer { flex-direction: column; gap: 6px; }
 }
 
+
+/* Compact spacing: retain the devotional theme and 44px touch targets. */
+.wrap{gap:12px}
+.head{padding-top:18px;padding-bottom:14px}
+.header-deities{top:17px}
+.main-tab{min-height:44px;padding-block:8px}
+.tab-panel{gap:12px}
+.day,.day.is-today{padding:12px 16px;gap:8px}
+.days{gap:8px}
+.day-head{padding-bottom:6px}
+.shift{gap:6px}
+.shift+.shift{padding-top:8px}
+.backup-area{margin-top:12px}
+.panel,.backups,.volunteer-card{padding:14px;gap:8px}
+.directory-controls{padding:12px;gap:8px}
+.volunteer-grid,.instr-list{gap:8px}
+.volunteer-section{gap:5px}
+.instr summary{min-height:44px}
+.site-footer{padding-top:14px}
+.field input.sr{width:1px;min-height:1px}
+#instructions-panel>aside{padding:12px 14px}
+@media(min-width:760px){
+#days > .day{grid-template-columns:180px minmax(0,1fr) minmax(0,1fr);align-items:center;column-gap:18px}
+#days > .day > .day-head{grid-column:auto;align-self:stretch;align-items:center;border-bottom:0;padding:0;gap:2px 8px;align-content:center}
+#days > .day > .day-head .pill{margin-left:0}
+#days > .day > .shift+.shift{padding-top:0;padding-left:18px}
+#days > .day:has(.load-form:not([hidden])){grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+#days > .day:has(.load-form:not([hidden])) > .day-head{grid-column:1/-1;padding-bottom:6px;border-bottom:1px solid var(--line)}
+}
+@media(max-width:600px){
+.head{padding:16px 0 14px 54px;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}
+.header-deities{top:18px}
+.head .eyebrow{grid-column:1/-1;font-size:8px;letter-spacing:.07em}
+h1{font-size:30px}
+.account-bar{grid-column:2;grid-row:2;margin:0}
+.account-bar .btn-small{padding-inline:10px}
+.account-bar:has(#account-label:not(:empty)){grid-column:1/-1;grid-row:auto;max-width:none;margin-top:4px}
+.day,.day.is-today{padding:12px;gap:8px}
+.shift-details{gap:2px}
+.shift+.shift{padding-top:8px}
+.directory-controls{grid-template-columns:repeat(2,minmax(0,1fr))}
+.directory-controls .field:first-child{grid-column:1/-1}
+.directory-controls .field{gap:4px}
+.directory-controls .field:last-child{grid-column:1/-1}
+.section-intro{gap:1px}
+.volunteer-card{gap:8px}
+}
+
 @media (prefers-color-scheme: dark) {
  :root:not([data-theme="light"]) {
   --bg: #211c17; --surface: #2c251e; --fg: #f6efdf; --muted: #c4b69e;
@@ -335,7 +383,7 @@ a { color: var(--accent); }
   </div>
   <div class="tab-panel" id="instructions-panel" role="tabpanel" aria-labelledby="instructions-tab" hidden>
   <div class="section-intro"><h2>Service guidance</h2><p>Care for every load. Support the next volunteer.</p></div>
-  <aside style="padding:20px; border:2px solid var(--warn-line); border-radius:14px; background:var(--warn-bg); color:var(--warn-fg);" aria-labelledby="instructions-progress-title">
+  <aside style="border:2px solid var(--warn-line); border-radius:14px; background:var(--warn-bg); color:var(--warn-fg);" aria-labelledby="instructions-progress-title">
     <h2 id="instructions-progress-title" style="font-size:22px;">Work in progress</h2>
     <p style="margin:8px 0 0;">This instructions page is still being prepared. Please check with your coordinator for current service guidance.</p>
   </aside>

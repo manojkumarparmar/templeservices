@@ -143,3 +143,13 @@ This section distinguishes work performed in this chat from earlier volunteer, n
 ### Chat project context
 
 - App initially listed this chat without a project even though the user's screenshot showed it under Temple Services. The move_thread_to_project tool successfully explicitly associated this chat with the local Temple Services project, ID 5fd25556-ec9a-4d7e-827b-a26060d563ed. Do not ask the user to recreate this chat based solely on that earlier null result.
+
+
+## Compact spacing (November 3, 2026)
+
+- Applied the reviewed compact-spacing prototype to the real site while retaining the existing theme, fonts, navigation and content. Shared header, cards, panels, instructions and directory use tighter vertical spacing.
+- Mobile directory keeps Search and Sort by full width, with Role and Service day sharing a row. Sort by stays above its dropdown like every other filter label. Touch targets remain at least 44px.
+- Desktop rolling schedule places the date beside morning/evening shifts. Opening notes or backup forms restores a two-column layout with a full-width day heading. Historical day headings retain their original grid structure.
+- Signed-in mobile headers keep the account label on a separate row; shift actions can wrap. Hidden camera file inputs have a constrained width to prevent horizontal page overflow.
+- Scope is presentation only: no roster, assignment, instruction text, authentication, API or database changes. No migrations.
+- Validation: all 48 existing tests pass; static build and diff whitespace check pass. Visually checked public and fixture-signed-in pages at mobile, tablet and desktop widths, including Sort by placement and expanded notes. Server compilation was not rerun because Wrangler was unavailable in the offline cache; server code is unchanged.
