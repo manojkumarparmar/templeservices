@@ -178,10 +178,21 @@ h2, h3 { margin: 0; }
 .volunteer-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); min-width: 0; }
 .volunteer-card h3 { font-family: var(--font-display); font-size: 22px; overflow-wrap: anywhere; }
 .volunteer-card p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.volunteer-contacts { font-size: 14px; font-weight: 400; line-height: 1.5; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.volunteer-identity, .volunteer-name-row { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-width: 0; vertical-align: middle; }
+.volunteer-identity > span:first-child, .volunteer-name-row h3 { min-width: 0; overflow-wrap: anywhere; }
+.volunteer-contacts { font-size: 14px; font-weight: 400; line-height: 1.5; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; vertical-align: middle; }
+.volunteer-name-row .volunteer-contacts { flex: 0 0 auto; }
 .volunteer-contact { min-height: 44px; display: inline-flex; align-items: center; color: var(--accent); overflow-wrap: anywhere; max-width: 100%; }
-.volunteer-contact.contact-icon { width: 44px; flex: 0 0 44px; justify-content: center; border: 1px solid var(--line); border-radius: 10px; }
-.volunteer-contact.contact-icon:hover { background: var(--today-bg); }
+.contact-toggle { width: 44px; flex: 0 0 44px; justify-content: center; border: 1px solid var(--line); border-radius: 8px; padding: 0; background: transparent; cursor: pointer; }
+.contact-toggle:hover, .contact-toggle[aria-expanded="true"] { background: var(--today-bg); border-color: var(--accent); }
+.contact-menu { position: fixed; inset: auto; margin: 0; width: min(220px, calc(100vw - 16px)); padding: 6px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); box-shadow: 0 10px 28px #342a2226; z-index: 30; font: 400 14px/1.45 var(--font-body); text-align: left; white-space: normal; }
+.contact-menu-heading { display: block; padding: 7px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.contact-mode { display: flex; gap: 10px; padding: 9px 10px; border-radius: 6px; color: var(--fg); text-decoration: none; }
+.contact-mode:hover { background: var(--today-bg); }
+.contact-mode svg { flex: 0 0 20px; color: var(--accent); }
+.recurring-choice-row { display: flex; align-items: center; gap: 8px; }
+.recurring-choice-row .check-label { min-width: 0; flex-wrap: nowrap; }
+.recurring-choice-row .volunteer-contacts { flex: 0 0 auto; }
 .volunteer-contact:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .volunteer-roles, .assignment-list, .editor-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .assignment-list { list-style: none; padding: 0; margin: 0; }

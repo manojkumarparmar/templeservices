@@ -37,8 +37,9 @@ function renderRecurring() {
             if (input.checked) v.assignments.push({weekday:weekday,shift:shift});
             updateSummary();
           });
-          label.appendChild(input); label.appendChild(document.createTextNode(v.name)); choices.appendChild(label);
-          var contact = el('div'); var person = volunteerDirectory.find(function (p) { return p.id === v.id; }); appendVolunteerContacts(contact, person); choices.appendChild(contact);
+          var choice = el('div', 'recurring-choice-row');
+          label.appendChild(input); label.appendChild(document.createTextNode(v.name)); choice.appendChild(label);
+          var person = volunteerDirectory.find(function (p) { return p.id === v.id; }); appendVolunteerContacts(choice, person); choices.appendChild(choice);
         });
         cell.appendChild(picker);
       }

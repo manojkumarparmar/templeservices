@@ -16,21 +16,25 @@ class Element {
   getAttribute(key) { return this.attrs[key]; }
   addEventListener(key, handler) { this.events[key] = handler; }
   focus() { this.focused = true; }
+  contains(node) { return !!node && find(this, child => child === node).length > 0; }
+  getBoundingClientRect() { return {left:280,top:550,bottom:594}; }
+  get offsetWidth() { return 220; }
+  get offsetHeight() { return 180; }
   showModal() { this.open = true; }
   close() { this.open = false; }
   querySelector(tag) { return this.querySelectorAll(tag)[0] || null; }
   querySelectorAll(tags) { return find(this, n => tags.split(',').map(t => t.trim()).includes(n.tag)); }
 }
 async function fixture() {
-  const nodes = {};
+  const nodes = {}, documentEvents = {};
   for (const match of html.matchAll(/<[^>]*id="([^"]+)"[^>]*>/g)) {
     const node = nodes[match[1]] = new Element();
     for (const attr of match[0].matchAll(/([\w-]+)="([^"]*)"/g)) node.attrs[attr[1]] = attr[2];
   }
   let updates = [], backups = {}, fail = false;
   const context = vm.createContext({
-    crypto, AbortSignal, setInterval() {},
-    document: { getElementById: id => { assert.ok(nodes[id], id); return nodes[id]; }, createElement: tag => new Element(tag), createTextNode: text => ({ text }), addEventListener() {} },
+    crypto, AbortSignal, setInterval() {}, window: {innerHeight:640},
+    document: { documentElement:{clientWidth:390}, getElementById: id => { assert.ok(nodes[id], id); return nodes[id]; }, createElement: tag => new Element(tag), createTextNode: text => ({ text }), addEventListener(type, handler) { (documentEvents[type] ||= []).push(handler); } },
     localStorage: { getItem() { return null; }, setItem() {} },
     async fetch(path, options) {
       if (fail) throw new Error('Connection failed');
@@ -63,7 +67,7 @@ async function fixture() {
   vm.runInContext(recurringScript, context);
   vm.runInContext(peopleScript, context);
   await vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
-  return { nodes, context, setFail(value) { fail = value; }, get updates() { return updates; } };
+  return { nodes, context, documentEvents, setFail(value) { fail = value; }, get updates() { return updates; } };
 }
 const buttons = (node, text) => find(node, n => n.tag === 'button' && n.text === text);
 
@@ -308,8 +312,8 @@ test('existing volunteer cards show contact actions only while signed in and cle
   context.volunteerDirectory=[{id:'person',name:'Sample Mtj',phone:'+12145550123',email:'sample@example.com',roles:['volunteer'],assignments:[],availabilityNotes:'',active:true}];
   context.renderVolunteers();
   let links=find(nodes['volunteer-list'],n=>n.tag==='a');
-  assert.deepEqual(links.map(n=>n.href),['tel:+12145550123','sms:+12145550123','mailto:sample@example.com']);
-  assert.equal(links[0].text,undefined); assert.equal(links[1].text,undefined);
+  assert.deepEqual(links.map(n=>n.href),['tel:+12145550123','sms:+12145550123','https://wa.me/12145550123','mailto:sample@example.com']);
+  assert.equal(links[0].text,'Call'); assert.equal(links[1].text,'SMS');
   assert.match(links[0].innerHTML,/<svg/); assert.match(links[1].innerHTML,/<svg/);
   assert.equal(find(nodes['volunteer-list'],n=>n.className==='note volunteer-phone')[0].text,'+12145550123');
   assert.equal(links[0].attrs['aria-label'],'Call Sample Mtj');
@@ -331,26 +335,75 @@ test('contact actions cover current schedules, backups, recurring assignments an
   context.volunteerDirectory=[person];
   const links=node=>find(node,n=>n.tag==='a');
   context.applyVolunteerSchedule(); context.renderRecurring();
-  assert.equal(links(nodes['backup-list']).length,3);
-  assert.equal(links(nodes['recurring-body']).length,3);
-  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,3);
+  assert.equal(links(nodes['backup-list']).length,4);
+  assert.equal(links(nodes['recurring-body']).length,4);
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,4);
   assert.equal(links(context.renderScheduledShift(yesterday,'am',[person.name],today)).length,0);
   const entry={who:person.name,volunteerId:person.id,date:today,time:new Date().toISOString()};
-  assert.equal(links(context.renderUpdate(entry)).length,3);
+  assert.equal(links(context.renderUpdate(entry)).length,4);
   assert.equal(links(context.renderUpdate({...entry,date:yesterday})).length,0);
   assert.equal(links(context.renderUpdate(entry,true)).length,0);
   context.sharedBackups[today+':am']={person:person.name,cover:'Another Mtj',coveredBy:'other'};
   context.volunteerDirectory.push({...person,id:'other',name:'Another Mtj'});
-  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,6);
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,8);
   // Ambiguous names must not accidentally expose another person's contact information.
   context.volunteerDirectory.push({...person,id:'duplicate'});
   assert.equal(links(context.volunteerIdentity(person.name)).length,0);
-  assert.equal(links(context.volunteerIdentity(person.name,person.id)).length,3);
+  assert.equal(links(context.volunteerIdentity(person.name,person.id)).length,4);
   context.currentUser=null; context.updateAccount();
   assert.equal(links(nodes['backup-list']).length,0);
   assert.equal(links(nodes['recurring-body']).length,0);
   assert.equal(links(nodes.days).length,0);
   assert.equal(links(context.renderUpdate(entry)).length,0);
+});
+
+test('combined contact menu stays beside the name and supports dismissal, focus and viewport edges', async () => {
+  const {nodes,context,documentEvents}=await fixture();
+  const person={id:'menu-person',name:'Sample Mtj',phone:'+1 (214) 555-0123',email:'sample@example.com',roles:['volunteer'],assignments:[],availabilityNotes:'',active:true};
+  context.volunteerDirectory=[person]; context.renderVolunteers();
+  const row=find(nodes['volunteer-list'],n=>n.className==='volunteer-name-row')[0];
+  const button=find(row,n=>n.className==='volunteer-contact contact-toggle')[0];
+  const menu=find(row,n=>n.className==='contact-menu')[0];
+  const links=find(menu,n=>n.tag==='a');
+  assert.equal(row.children[0].tag,'h3');
+  assert.equal(find(row,n=>n.tag==='button').length,1);
+  assert.equal(menu.hidden,true); assert.equal(button.attrs['aria-controls'],menu.id);
+  assert.deepEqual(links.map(n=>n.href),['tel:+1 (214) 555-0123','sms:+1 (214) 555-0123','https://wa.me/12145550123']);
+  assert.equal(links[2].target,'_blank'); assert.equal(links[2].rel,'noopener noreferrer');
+  const click={preventDefault(){},stopPropagation(){}};
+  button.events.click(click);
+  assert.equal(menu.hidden,false); assert.equal(button.attrs['aria-expanded'],'true');
+  assert.equal(menu.style.left,'162px'); assert.equal(menu.style.top,'365px');
+  // Focus moving into the menu keeps the choices available to the keyboard.
+  row.children[1].events.focusout({relatedTarget:links[0]}); assert.equal(menu.hidden,false);
+  for(const handler of documentEvents.keydown) handler({key:'Escape',preventDefault(){}});
+  assert.equal(menu.hidden,true); assert.equal(button.focused,true);
+  button.events.click(click); button.events.click(click); assert.equal(menu.hidden,true);
+  button.events.click(click); links[2].events.click(); assert.equal(menu.hidden,true);
+  button.events.click(click);
+  for(const handler of documentEvents.click) handler({target:new Element('div')});
+  assert.equal(menu.hidden,true);
+  button.events.click(click);
+  for(const handler of documentEvents.scroll) handler();
+  assert.equal(menu.hidden,true);
+  button.events.click(click); context.currentUser=null; context.updateAccount();
+  assert.equal(menu.hidden,true); assert.equal(context.openVolunteerContact,null);
+  assert.equal(find(nodes['volunteer-list'],n=>n.tag==='a').length,0);
+});
+
+test('only one contact menu opens and email-only volunteers keep their email link', async () => {
+  const {context}=await fixture();
+  const a=new Element('span'), b=new Element('span');
+  context.appendVolunteerContacts(a,{name:'First',phone:'+12145550123'});
+  context.appendVolunteerContacts(b,{name:'Second',phone:'+12145550124'});
+  const first=find(a,n=>n.tag==='button')[0], second=find(b,n=>n.tag==='button')[0];
+  const click={preventDefault(){},stopPropagation(){}};
+  first.events.click(click); second.events.click(click);
+  assert.equal(first.attrs['aria-expanded'],'false'); assert.equal(second.attrs['aria-expanded'],'true');
+  const emailOnly=new Element('span');
+  context.appendVolunteerContacts(emailOnly,{name:'Email Only',email:'only@example.com'});
+  assert.equal(find(emailOnly,n=>n.tag==='button').length,0);
+  assert.equal(find(emailOnly,n=>n.tag==='a')[0].href,'mailto:only@example.com');
 });
 
 test('Google sign-in uses configured client and nonce and submits credentials to existing authentication', async () => {

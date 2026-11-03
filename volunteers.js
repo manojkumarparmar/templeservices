@@ -33,7 +33,7 @@ async function openSignIn() {
           });
         }
         google.accounts.id.initialize({ client_id: loginConfig.googleClientId, nonce: loginConfig.nonce, callback: async function (response) {
-          status.textContent = 'Signing in�';
+          status.textContent = 'Signing in…';
           try { var result = await api('auth/google', { credential: response.credential }); await signedIn(result.user); }
           catch (error) { status.textContent = error.message; }
         } });
@@ -45,6 +45,7 @@ async function openSignIn() {
   } catch (error) { status.textContent = error.message; }
 }
 function updateAccount() {
+  closeVolunteerContact();
   updateHistoryAccess();
   document.getElementById('account-label').textContent = currentUser ? 'Signed in as ' + currentUser.name : '';
   document.getElementById('sign-in').hidden = !!currentUser;
@@ -87,22 +88,67 @@ async function refreshVolunteers() {
   sharedListeners.forEach(function (listener) { listener(); });
   if (!recurringDraft) renderRecurring();
 }
-function appendVolunteerContacts(parent, volunteer, dateIso) {
+var openVolunteerContact = null, volunteerContactSequence = 0;
+function closeVolunteerContact(restoreFocus) {
+  if (!openVolunteerContact) return;
+  var opened = openVolunteerContact; openVolunteerContact = null;
+  if (opened.menu.hidePopover && opened.menu.isConnected && !opened.menu.hidden) opened.menu.hidePopover();
+  opened.menu.hidden = true;
+  opened.button.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) opened.button.focus();
+}
+document.addEventListener('click', function (event) {
+  if (openVolunteerContact && !openVolunteerContact.container.contains(event.target)) closeVolunteerContact();
+});
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape' && openVolunteerContact) { event.preventDefault(); closeVolunteerContact(true); }
+});
+document.addEventListener('scroll', function () { closeVolunteerContact(); }, true);
+function appendVolunteerContacts(parent, volunteer, dateIso, emailParent) {
   if (!currentUser || !volunteer || (dateIso && dateIso < iso(templeToday()))) return;
-  var contacts = el('div', 'volunteer-contacts');
+  var contacts = el('span', 'volunteer-contacts'), menu;
   function contactLink(label, href, action, icon) {
+    if (icon && !label) label = action === 'Call' ? 'Call' : 'SMS';
     var link = el('a', 'volunteer-contact', label); link.href = href;
     link.setAttribute('aria-label', action + ' ' + volunteer.name);
     link.setAttribute('title', action + ' ' + volunteer.name);
     if (icon) {
-      link.className += ' contact-icon';
+      link.className += ' contact-mode';
       link.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + icon + '</svg>';
+      link.appendChild(document.createTextNode(label));
+      link.addEventListener('click', function () { closeVolunteerContact(); });
     }
-    contacts.appendChild(link);
+    (icon ? menu : emailParent || contacts).appendChild(link);
+    return link;
   }
   if (volunteer.phone) {
+    var button = el('button', 'volunteer-contact contact-toggle'); button.type = 'button';
+    button.setAttribute('aria-label', 'Contact ' + volunteer.name); button.setAttribute('title', 'Contact ' + volunteer.name);
+    button.setAttribute('aria-expanded', 'false');
+    button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="10" cy="9" r="2.5"/><path d="M5 18v-1a5 5 0 0 1 10 0v1M17 8h2M17 12h2M17 16h2"/></svg>';
+    menu = el('span', 'contact-menu'); menu.id = 'volunteer-contact-' + (++volunteerContactSequence); menu.hidden = true;
+    menu.setAttribute('popover', 'manual'); menu.setAttribute('role', 'group'); menu.setAttribute('aria-label', 'Contact ' + volunteer.name);
+    button.setAttribute('aria-controls', menu.id);
+    menu.appendChild(el('span', 'contact-menu-heading', volunteer.name));
+    contacts.appendChild(button); contacts.appendChild(menu);
+    button.addEventListener('click', function (event) {
+      event.preventDefault(); event.stopPropagation();
+      var wasOpen = openVolunteerContact && openVolunteerContact.button === button;
+      closeVolunteerContact(); if (wasOpen) return;
+      menu.hidden = false; if (menu.showPopover) menu.showPopover();
+      var rect = button.getBoundingClientRect(), width = document.documentElement.clientWidth;
+      menu.style.left = Math.max(8, Math.min(rect.left, width - menu.offsetWidth - 8)) + 'px';
+      menu.style.top = Math.max(8, rect.bottom + 5 + menu.offsetHeight > window.innerHeight ? rect.top - menu.offsetHeight - 5 : rect.bottom + 5) + 'px';
+      button.setAttribute('aria-expanded', 'true');
+      openVolunteerContact = {button:button, menu:menu, container:contacts};
+    });
+    contacts.addEventListener('focusout', function (event) {
+      if (!contacts.contains(event.relatedTarget)) closeVolunteerContact();
+    });
     contactLink(null, 'tel:' + volunteer.phone, 'Call', '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.69 2.79a2 2 0 0 1-.45 2.11L8.09 9.89a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.33 1.83.56 2.79.69A2 2 0 0 1 22 16.92z"/>');
     contactLink(null, 'sms:' + volunteer.phone, 'Send SMS to', '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><path d="M8 10h8M8 14h5"/>');
+    var whatsapp = contactLink('WhatsApp', 'https://wa.me/' + volunteer.phone.replace(/\D/g, ''), 'WhatsApp', '<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/><path d="M8 8c0 4 2 6 6 6l1-2-2-1-1 1-2-2 1-1-1-2z"/>');
+    whatsapp.target = '_blank'; whatsapp.rel = 'noopener noreferrer';
   }
   if (volunteer.email) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
   if (contacts.children.length) parent.appendChild(contacts);
@@ -115,6 +161,7 @@ function volunteerIdentity(name, id, dateIso) {
   return node;
 }
 function renderVolunteers() {
+  closeVolunteerContact();
   var list = document.getElementById('volunteer-list'); list.textContent = '';
   document.getElementById('volunteers-status').textContent = '';
   var search = document.getElementById('volunteer-search').value.trim().toLowerCase();
@@ -134,7 +181,8 @@ function renderVolunteers() {
   visible.forEach(function (volunteer) {
     var card = el('article', 'volunteer-card' + (volunteer.active ? '' : ' inactive-volunteer'));
     var identity = el('div', 'volunteer-section'); card.appendChild(identity);
-    identity.appendChild(el('h3', null, volunteer.name));
+    var nameRow = el('div', 'volunteer-name-row'); identity.appendChild(nameRow);
+    nameRow.appendChild(el('h3', null, volunteer.name));
     var roles = el('div', 'volunteer-roles');
     volunteer.roles.forEach(function (role) { roles.appendChild(el('span', 'chip note-kind', role)); });
     if (!volunteer.active) roles.appendChild(el('span', 'chip away', 'Inactive'));
@@ -151,7 +199,7 @@ function renderVolunteers() {
     }
     if (currentUser) {
       if (volunteer.phone) identity.appendChild(el('p', 'note volunteer-phone', volunteer.phone));
-      appendVolunteerContacts(identity, volunteer);
+      appendVolunteerContacts(nameRow, volunteer, null, identity);
     }
     var canEdit = managesVolunteers() && (!volunteer.isSuperAdmin || currentUser.isSuperAdmin);
     if (volunteer.isSuperAdmin) card.appendChild(el('p', 'volunteer-protected', 'Protected super-admin · role cannot be removed.'));

@@ -26,6 +26,6 @@ Read `PROJECT_MEMORY.md` for the complete November 1, 2026 session record, deplo
 
 - Contact links also appear beside names in current/upcoming shifts, backup coverage, Permanent backups, recurring assignments (including editor choices), and current shift note authors. Never show contacts for dated schedules/notes before today or anywhere in History. Match IDs where available; omit ambiguous name matches.
 
-- All contact actions use icon-only call and SMS links with accessible names and tooltips, rather than an SMS text label. Volunteers tab profiles additionally display the full phone number alongside the two icons; other views show icons only. Email links retain their address text. Phone numbers remain editable in administrator forms.
+- Phone contacts use one accessible contact icon on the same row as the volunteer name. It opens a floating Call, SMS and WhatsApp menu without adding row height. WhatsApp uses wa.me with international digits and does not verify account availability. Menus dismiss on outside click, Escape, focus leaving, scrolling and sign-out. Directory profiles retain their full phone number; email links retain their address text. Phone numbers remain editable in administrator forms. Keep current sign-in and historical-date restrictions.
 
 - Sign-in offers Continue with Google alongside registered US mobile phone login. Google uses the existing OAuth client, nonce verification and server-side active volunteer email/linked-identity checks; it never creates an unapproved volunteer.
