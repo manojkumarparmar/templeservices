@@ -311,6 +311,7 @@ test('existing volunteer cards show contact actions only while signed in and cle
   assert.deepEqual(links.map(n=>n.href),['tel:+12145550123','sms:+12145550123','mailto:sample@example.com']);
   assert.equal(links[0].text,undefined); assert.equal(links[1].text,undefined);
   assert.match(links[0].innerHTML,/<svg/); assert.match(links[1].innerHTML,/<svg/);
+  assert.equal(find(nodes['volunteer-list'],n=>n.className==='note volunteer-phone')[0].text,'+12145550123');
   assert.equal(links[0].attrs['aria-label'],'Call Sample Mtj');
   assert.equal(links[1].attrs['aria-label'],'Send SMS to Sample Mtj');
   assert.equal(buttons(nodes['volunteer-list'],'Edit volunteer').length,0);
@@ -320,6 +321,7 @@ test('existing volunteer cards show contact actions only while signed in and cle
   await nodes['sign-out'].events.click();
   assert.equal(context.currentUser,null);
   assert.equal(find(nodes['volunteer-list'],n=>n.tag==='a').length,0);
+  assert.equal(find(nodes['volunteer-list'],n=>n.className==='note volunteer-phone').length,0);
 });
 
 test('contact actions cover current schedules, backups, recurring assignments and notes, excluding every past date', async () => {

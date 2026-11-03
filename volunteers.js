@@ -132,6 +132,7 @@ function renderVolunteers() {
       availability.appendChild(el('p', 'note', volunteer.availabilityNotes));
     }
     if (currentUser) {
+      if (volunteer.phone) identity.appendChild(el('p', 'note volunteer-phone', volunteer.phone));
       appendVolunteerContacts(identity, volunteer);
     }
     var canEdit = managesVolunteers() && (!volunteer.isSuperAdmin || currentUser.isSuperAdmin);
