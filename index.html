@@ -336,6 +336,22 @@ h1{font-size:30px}
  .check-label:has(input:checked) { background: var(--cover-bg); color: var(--cover-fg); }
  .btn-primary:hover:not(:disabled) { background: #ffc38a; }
 }
+
+/* Compact shift actions and prominent three-state backup indicator. */
+.shift-header{align-items:center;gap:6px}
+.shift-details{flex:1 1 auto;min-width:0}
+.shift-actions{flex:0 0 auto;flex-wrap:nowrap;max-width:none;gap:4px;align-items:center}
+.shift-actions .icon-action{width:34px;height:34px;min-height:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:8px}
+.icon-action svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.icon-action.has-note::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);position:absolute;right:2px;top:2px}
+.icon-action{position:relative}
+.shift.backup-needed{background:var(--away-bg);outline:2px solid var(--away-fg);border-radius:10px;padding:10px}
+.shift.backup-needed .backup-message{font-weight:700;color:var(--away-fg)}
+.shift.backup-confirmed-state{background:var(--cover-bg);outline:2px solid var(--cover-fg);border-radius:10px;padding:10px}
+.shift-status-banner{font-size:12px;font-weight:700;letter-spacing:.02em}
+.backup-needed .shift-status-banner{color:var(--away-fg)}
+.backup-confirmed-state .shift-status-banner{color:var(--cover-fg)}
+@media(max-width:600px){.shift-header{flex-wrap:nowrap}.shift-actions{max-width:none}}
 </style>
 </head>
 <body>
@@ -666,6 +682,9 @@ function renderInstructions() {
 }
 
 /* ---- Shift backup requests ---- */
+function shiftIcon(kind) {
+  return kind === "hand" ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 12V6a1.5 1.5 0 0 1 3 0v4-6a1.5 1.5 0 0 1 3 0v6-4a1.5 1.5 0 0 1 3 0v5-3a1.5 1.5 0 0 1 3 0v7c0 4-2.5 6-6 6h-2c-2 0-3.5-1-4.5-2.5L3 14a1.7 1.7 0 0 1 2.7-2z"/></svg>' : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.5-1 11-11a2.1 2.1 0 0 0-3-3l-11 11L4 20Z"/><path d="m14.5 7.5 3 3"/></svg>';
+}
 function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
   var shift = el("div", "shift");
   var header = el("div", "shift-header");
@@ -684,7 +703,7 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     else if (savedPlan === null) people = [];
     var request = sharedBackups[key];
     var pending = request && !request.cover;
-    shift.className = "shift" + (pending ? " backup-needed" : "");
+    shift.className = "shift" + (pending ? " backup-needed" : (request && request.cover ? " backup-confirmed-state" : ""));
     details.textContent = ""; backupAction.textContent = ""; formArea.textContent = "";
     var displayedPeople = request && request.cover ? [request.cover] : (request && request.wasBackup ? [request.person] : people);
     var schedule = renderShift(dateIso, shiftKey, displayedPeople);
@@ -694,9 +713,11 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     if (savedPlan === null) details.appendChild(el('div','note','Original assignment not recorded.'));
     if (request) {
       if (request.cover) {
+        details.appendChild(el("div", "shift-status-banner", "✓ BACKUP CONFIRMED"));
         details.appendChild(el("span", "chip cover", "Backup volunteer"));
         details.appendChild(el("div", "note", "Covering for " + request.person + ". Originally scheduled: " + (people.join(" & ") || "Unassigned") + "."));
       } else {
+        details.appendChild(el("div", "shift-status-banner", "⚠ BACKUP NEEDED — VOLUNTEER REQUIRED"));
         details.appendChild(el("span", "chip need", "Needs backup"));
         details.appendChild(el("div", "backup-message", request.person + (request.wasBackup ? " (backup volunteer) is unavailable. Another backup is needed." : " is unavailable. A backup volunteer is needed.")));
       }
@@ -710,7 +731,8 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     var managesShift = currentUser.isSuperAdmin || currentUser.roles.some(function (role) { return ['super-admin','admin','coordinator'].indexOf(role) >= 0; });
     var assigned = request && request.cover ? request.coveredBy === currentUser.id : people.indexOf(currentUser.name) >= 0;
     if (!pending && !managesShift && !assigned) return;
-    var button = el("button", "btn-small", pending ? "Opt for backup" : "Need backup"); button.type = "button"; button.disabled = !sharedReady;
+    var button = el("button", pending ? "btn-small" : "btn-small icon-action", pending ? "Opt for backup" : ""); button.type = "button"; button.disabled = !sharedReady;
+    if (!pending) { button.innerHTML = shiftIcon("hand"); button.setAttribute("aria-label", "Request backup for " + dateIso + " " + shiftKey); button.title = "Need backup"; }
     button.setAttribute("aria-expanded", "false");
     var formId = "backup-" + key.replace(":", "-"); button.setAttribute("aria-controls", formId);
     backupAction.appendChild(button);
@@ -792,7 +814,8 @@ function renderUpdate(entry, hideContacts) {
 }
 function renderLoadNotes(dateIso, shiftKey, actions, allowNotes) {
   var box = el("div", "load-notes");
-  var button = el("button", "btn-small", "Add Notes");
+  var button = el("button", "btn-small icon-action");
+  button.innerHTML = shiftIcon("pencil"); button.title = "Add notes";
   button.type = "button"; button.disabled = !sharedReady;
   var formId = "update-" + dateIso + "-" + shiftKey;
   button.setAttribute("aria-expanded", "false");
@@ -846,7 +869,9 @@ function renderLoadNotes(dateIso, shiftKey, actions, allowNotes) {
   }
   function refreshSummary() {
     var mine = ownEntry();
-    button.textContent = mine ? 'Edit Notes' : 'Add Notes';
+    button.innerHTML = shiftIcon("pencil");
+    button.classList.toggle("has-note", !!mine);
+    button.title = mine ? "Edit my notes" : "Add notes";
     button.setAttribute('aria-label', (mine ? 'Edit Notes' : 'Add Notes') + ' for ' + dateIso + ' ' + (shiftKey === 'am' ? 'morning' : 'evening'));
     list.textContent = "";
     loadUpdates().filter(function (n) { return n.date === dateIso && n.shift === shiftKey && (form.hidden || !editingEntry || n.id !== editingEntry.id); })
