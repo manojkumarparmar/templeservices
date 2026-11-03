@@ -21,9 +21,27 @@ async function openSignIn() {
     phoneConfirmation = null; resetPhoneChallenge();
     document.getElementById('email-start').hidden = !loginConfig.emailEnabled;
     document.getElementById('email-verify').hidden = true;
-    document.getElementById('google-sign-in').hidden = true;
+    var googleBox = document.getElementById('google-sign-in');
+    googleBox.textContent = ''; googleBox.hidden = !loginConfig.googleClientId;
+    if (loginConfig.googleClientId) {
+      try {
+        if (!window.google || !window.google.accounts) {
+          await new Promise(function (resolve, reject) {
+            var script = document.createElement('script'); script.src = 'https://accounts.google.com/gsi/client'; script.async = true;
+            script.onload = resolve; script.onerror = function () { reject(new Error('Google sign-in could not load. Please retry or use your registered phone.')); };
+            document.head.appendChild(script);
+          });
+        }
+        google.accounts.id.initialize({ client_id: loginConfig.googleClientId, nonce: loginConfig.nonce, callback: async function (response) {
+          status.textContent = 'Signing in…';
+          try { var result = await api('auth/google', { credential: response.credential }); await signedIn(result.user); }
+          catch (error) { status.textContent = error.message; }
+        } });
+        google.accounts.id.renderButton(googleBox, { theme: 'outline', size: 'large', text: 'continue_with' });
+      } catch (error) { googleBox.hidden = true; status.textContent = error.message; return; }
+    }
     document.getElementById('email-start').hidden = true;
-    status.textContent = loginConfig.firebase ? '' : 'Phone sign-in is unavailable. Please contact your coordinator.';
+    status.textContent = loginConfig.firebase || loginConfig.googleClientId ? '' : 'Sign-in is unavailable. Please contact your coordinator.';
   } catch (error) { status.textContent = error.message; }
 }
 function updateAccount() {
@@ -239,7 +257,6 @@ async function initPeople() {
       if (!loginConfig) loginConfig = await api('auth/config');
       document.getElementById('signin-lookup').hidden = true;
       document.getElementById('signin-methods').hidden = false;
-      document.getElementById('google-sign-in').hidden = true;
       document.getElementById('email-start').hidden = true;
       document.getElementById('email-verify').hidden = true;
       document.getElementById('phone-sign-in').hidden = match.kind !== 'phone' || !loginConfig.firebase;

@@ -352,3 +352,26 @@ test('contact actions cover current schedules, backups, recurring assignments an
   assert.equal(links(nodes.days).length,0);
   assert.equal(links(context.renderUpdate(entry)).length,0);
 });
+
+test('Google sign-in uses configured client and nonce and submits credentials to existing authentication', async () => {
+  const {nodes,context}=await fixture();
+  let settings, rendered, submitted;
+  context.window={google:{accounts:{id:{initialize(value){settings=value;},renderButton(node,options){rendered={node,options};}}}}};
+  context.google=context.window.google;
+  context.api=async (path,data)=>{
+    if(path==='auth/config') return {googleClientId:'test-client',nonce:'test-nonce',firebase:{}};
+    if(path==='auth/google') { submitted=data; return {user:{id:'approved'}}; }
+    throw new Error('Unexpected API '+path);
+  };
+  let user; context.signedIn=async value=>{user=value;};
+  await context.openSignIn();
+  assert.equal(nodes['google-sign-in'].hidden,false);
+  assert.equal(nodes['signin-lookup'].hidden,false);
+  assert.equal(settings.client_id,'test-client'); assert.equal(settings.nonce,'test-nonce');
+  assert.equal(rendered.node,nodes['google-sign-in']);
+  await settings.callback({credential:'google-token'});
+  assert.equal(submitted.credential,'google-token'); assert.equal(user.id,'approved');
+  context.api=async ()=>{throw new Error('Please ask an administrator to add your email to the volunteer list.');};
+  user=null; await settings.callback({credential:'unapproved-token'});
+  assert.equal(user,null); assert.match(nodes['auth-status'].textContent || nodes['auth-status'].text,/administrator/);
+});
