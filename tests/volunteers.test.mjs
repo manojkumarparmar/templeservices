@@ -140,3 +140,16 @@ test('sign-in lookup matches active emails and normalized phones without returni
   assert.deepEqual(await (await call('auth/lookup',{identifier:'2145550123'})).json(),{found:false,kind:'phone'});
   assert.equal((await call('auth/lookup',{identifier:'abc'})).status,400);
 });
+
+
+test('profile saves and removals succeed when D1 counts schedule-history trigger writes', async () => {
+  const {db,call}=fixture({d1TotalChanges:true});
+  const saved=(await directory(call)).find(v=>v.id==='ajinkya');
+  const before=db.prepare('SELECT count(*) AS n FROM schedule_versions').get().n;
+  assert.equal((await call('volunteers/save',{...saved,name:'Updated Ajinkya Pr'})).status,200);
+  assert.ok(db.prepare('SELECT count(*) AS n FROM schedule_versions').get().n>before);
+  assert.equal((await call('volunteers/save',{...saved,name:'Stale edit'})).status,409);
+  const updated=(await directory(call)).find(v=>v.id==='ajinkya');
+  assert.equal((await call('volunteers/remove',{id:updated.id,version:updated.version})).status,200);
+  assert.equal(db.prepare('SELECT active FROM volunteers WHERE id=?').get(updated.id).active,0);
+});

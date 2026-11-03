@@ -15,7 +15,14 @@ export function fixture(options = {}) {
         bind(...values) { args = values; return this; },
         async first() { return db.prepare(sql).get(...args) || null; },
         async all() { return { results: db.prepare(sql).all(...args) }; },
-        async run() { const result = db.prepare(sql).run(...args); return { meta: { changes: result.changes } }; }
+        async run() {
+          const before = db.prepare('SELECT total_changes() AS count').get().count;
+          const returning = /\bRETURNING\b/i.test(sql);
+          const results = returning ? db.prepare(sql).all(...args) : [];
+          const direct = returning ? results.length : db.prepare(sql).run(...args).changes;
+          const total = db.prepare('SELECT total_changes() AS count').get().count - before;
+          return {results, meta:{changes:options.d1TotalChanges ? total : direct}};
+        }
       }; },
       async batch(statements) { db.exec('BEGIN'); try { const results = []; for (const statement of statements) results.push(await statement.run()); db.exec('COMMIT'); return results; } catch (error) { db.exec('ROLLBACK'); throw error; } }
     },

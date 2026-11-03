@@ -111,7 +111,7 @@ async function saveVolunteer(data, user, env) {
   const id = current?.id || crypto.randomUUID();
   if (current) {
     fail(!Number.isInteger(data.version) || current.version !== data.version, 409, 'This volunteer was updated elsewhere. Reload the directory before editing again.');
-    const update = env.DB.prepare('UPDATE volunteers SET name=?,email=?,phone=?,availability_notes=?,assignments_json=?,roles_json=?,active=?,version=version+1,updated_at=? WHERE id=? AND version=?').bind(name, email || null, phone || null, availability, JSON.stringify(assignments), JSON.stringify(data.roles), data.active ? 1 : 0, new Date().toISOString(), id, data.version);
+    const update = env.DB.prepare('UPDATE volunteers SET name=?,email=?,phone=?,availability_notes=?,assignments_json=?,roles_json=?,active=?,version=version+1,updated_at=? WHERE id=? AND version=? RETURNING id').bind(name, email || null, phone || null, availability, JSON.stringify(assignments), JSON.stringify(data.roles), data.active ? 1 : 0, new Date().toISOString(), id, data.version);
     const revoke = email !== (current.email || '') || phone !== (current.phone || '') || !data.active;
     const statements = revoke ? [
       env.DB.prepare('DELETE FROM auth_sessions WHERE volunteer_id=? AND EXISTS(SELECT 1 FROM volunteers WHERE id=? AND version=?)').bind(id, id, data.version),
@@ -120,7 +120,7 @@ async function saveVolunteer(data, user, env) {
       update
     ] : [update];
     const results = await env.DB.batch(statements);
-    fail(results[results.length - 1].meta.changes !== 1, 409, 'This volunteer was updated elsewhere. Reload and try again.');
+    fail(results[results.length - 1].results.length !== 1, 409, 'This volunteer was updated elsewhere. Reload and try again.');
   } else {
     await env.DB.prepare('INSERT INTO volunteers(id,name,email,phone,availability_notes,assignments_json,roles_json,active) VALUES(?,?,?,?,?,?,?,?)').bind(id, name, email || null, phone || null, availability, JSON.stringify(assignments), JSON.stringify(data.roles), data.active ? 1 : 0).run();
   }
@@ -150,9 +150,9 @@ async function saveRecurringSchedule(data, user, env) {
       AND NOT EXISTS (SELECT 1 FROM volunteers v WHERE v.active=1 AND NOT EXISTS
         (SELECT 1 FROM proposed p WHERE json_extract(p.value,'$.id')=v.id AND json_extract(p.value,'$.version')=v.version)) AS ok)
     UPDATE volunteers SET assignments_json=(SELECT json_extract(value,'$.assignments') FROM proposed WHERE json_extract(value,'$.id')=volunteers.id),
-      version=version+1, updated_at=? WHERE active=1 AND (SELECT ok FROM valid)`)
+      version=version+1, updated_at=? WHERE active=1 AND (SELECT ok FROM valid) RETURNING id`)
     .bind(payload, new Date().toISOString()).run();
-  fail(result.meta.changes !== rows.length, 409, 'The schedule changed elsewhere. Reload and try again.');
+  fail(result.results.length !== rows.length, 409, 'The schedule changed elsewhere. Reload and try again.');
   return reply({saved:true});
 }
 export async function handlePeople(request, env, url, data, user) {
@@ -212,8 +212,8 @@ export async function handlePeople(request, env, url, data, user) {
     const row = await env.DB.prepare('SELECT * FROM volunteers WHERE id=?').bind(data.id || '').first();
     fail(!row, 404, 'Volunteer not found.'); fail(row.is_super_admin, 403, 'The super-admin cannot be removed.');
     fail(row.id === user.id, 403, 'You cannot remove your own administrator account.');
-    const result = await env.DB.prepare('UPDATE volunteers SET active=0,version=version+1 WHERE id=? AND version=?').bind(row.id, data.version).run();
-    fail(result.meta.changes !== 1, 409, 'This volunteer was updated elsewhere. Reload and try again.');
+    const result = await env.DB.prepare('UPDATE volunteers SET active=0,version=version+1 WHERE id=? AND version=? RETURNING id').bind(row.id, data.version).run();
+    fail(result.results.length !== 1, 409, 'This volunteer was updated elsewhere. Reload and try again.');
     return reply({ removed: true });
   }
   return null;

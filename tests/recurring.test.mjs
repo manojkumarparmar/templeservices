@@ -51,3 +51,13 @@ test('a concurrent profile change between validation and write prevents all sche
   assert.equal((await call('recurring/save',data)).status,409);
   assert.ok(JSON.parse(db.prepare('SELECT assignments_json FROM volunteers WHERE id=?').get('swetha').assignments_json).length>0);
 });
+
+
+test('recurring save succeeds with D1 trigger-inclusive counts and still rejects stale drafts', async () => {
+  const {db,call}=fixture({d1TotalChanges:true}); const data=await payload(call);
+  const before=db.prepare('SELECT count(*) AS n FROM schedule_versions').get().n;
+  data.volunteers.find(v=>v.id==='swetha').assignments=[{weekday:2,shift:'pm'}];
+  assert.equal((await call('recurring/save',data)).status,200);
+  assert.ok(db.prepare('SELECT count(*) AS n FROM schedule_versions').get().n>before);
+  assert.equal((await call('recurring/save',data)).status,409);
+});
