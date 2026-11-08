@@ -611,7 +611,7 @@ function renderShift(dateIso, shiftKey, people, unavailable) {
   var notes = [];
   people.forEach(function (p, i) {
     var abs = absencesFor(dateIso, shiftKey, p);
-    var span = volunteerIdentity(p, null, dateIso);
+    var span = volunteerIdentity(p, null, dateIso, true);
     if (abs.length || unavailable) span.className += " gone";
     if (i > 0) who.appendChild(document.createTextNode(" & "));
     who.appendChild(span);
@@ -626,12 +626,11 @@ function renderShift(dateIso, shiftKey, people, unavailable) {
   });
   box.appendChild(who);
   var anyAway = people.some(function (p) { return absencesFor(dateIso, shiftKey, p).length > 0; });
-  if (unavailable && !anyAway) box.appendChild(el("span", "chip away", "Unavailable"));
   if (anyAway) {
     box.appendChild(el("span", "chip away", "Away"));
     if (covers.length) box.appendChild(el("span", "chip cover", covers.join(" & ") + " covering"));
     else if (allAway) box.appendChild(el("span", "chip need", "Needs cover"));
-    if (dateIso >= iso(templeToday())) covers.forEach(function (name) { box.appendChild(volunteerIdentity(name, null, dateIso)); });
+    if (dateIso >= iso(templeToday())) covers.forEach(function (name) { box.appendChild(volunteerIdentity(name, null, dateIso, true)); });
     notes.forEach(function (n) { box.appendChild(el("div", "note", n)); });
   }
 
@@ -738,10 +737,10 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     details.appendChild(schedule);
     if (savedPlan === null) details.appendChild(el("div", "note", "Original assignment not recorded."));
     if (needed || assigned) {
-      details.appendChild(el("div", "shift-status-banner", assigned ? "✓ BACKUP CONFIRMED" : "⚠ BACKUP NEEDED"));
+      if (needed) details.appendChild(el("div", "shift-status-banner", "⚠ BACKUP NEEDED"));
       var slot = el("div", "slot-row");
       slot.appendChild(el("span", "slot-label", "Backup"));
-      if (assigned) slot.appendChild(volunteerIdentity(request.backup.name, request.backup.id, dateIso));
+      if (assigned) slot.appendChild(volunteerIdentity(request.backup.name, request.backup.id, dateIso, true));
       else slot.appendChild(el("span", "backup-message", "Needed"));
       details.appendChild(slot);
       if (request.requestedBy && request.requestedBy.name) details.appendChild(el("div", "note", "Requested by " + request.requestedBy.name + "."));

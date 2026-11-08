@@ -104,7 +104,7 @@ document.addEventListener('keydown', function (event) {
   if (event.key === 'Escape' && openVolunteerContact) { event.preventDefault(); closeVolunteerContact(true); }
 });
 document.addEventListener('scroll', function () { closeVolunteerContact(); }, true);
-function appendVolunteerContacts(parent, volunteer, dateIso, emailParent) {
+function appendVolunteerContacts(parent, volunteer, dateIso, emailParent, hideEmail) {
   if (!currentUser || !volunteer || (dateIso && dateIso < iso(templeToday()))) return;
   var contacts = el('span', 'volunteer-contacts'), menu;
   function contactLink(label, href, action, icon) {
@@ -150,14 +150,14 @@ function appendVolunteerContacts(parent, volunteer, dateIso, emailParent) {
     var whatsapp = contactLink('WhatsApp', 'https://wa.me/' + volunteer.phone.replace(/\D/g, ''), 'WhatsApp', '<path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/><path d="M8 8c0 4 2 6 6 6l1-2-2-1-1 1-2-2 1-1-1-2z"/>');
     whatsapp.target = '_blank'; whatsapp.rel = 'noopener noreferrer';
   }
-  if (volunteer.email) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
+  if (volunteer.email && !hideEmail) contactLink(volunteer.email, 'mailto:' + volunteer.email, 'Email');
   if (contacts.children.length) parent.appendChild(contacts);
 }
-function volunteerIdentity(name, id, dateIso) {
+function volunteerIdentity(name, id, dateIso, hideEmail) {
   var node = el('span', 'volunteer-identity');
   node.appendChild(el('span', null, name));
   var matches = volunteerDirectory.filter(function (v) { return v.active && (id ? v.id === id : v.name === name); });
-  if (matches.length === 1) appendVolunteerContacts(node, matches[0], dateIso);
+  if (matches.length === 1) appendVolunteerContacts(node, matches[0], dateIso, null, hideEmail);
   return node;
 }
 function renderVolunteers() {

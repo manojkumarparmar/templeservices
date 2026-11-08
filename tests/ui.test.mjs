@@ -255,8 +255,8 @@ test('backup flow keeps primaries on the card and moves between needed, assigned
   assert.equal(buttons(shift, 'Cancel need for backup').length, 0);
   assert.equal(buttons(shift, 'Offer to cover').length, 1);
   await buttons(shift, 'Offer to cover')[0].events.click();
-  assert.ok(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length);
   assert.ok(find(shift, n => n.text === 'Helper Mtj').length);
+  assert.equal(find(shift, n => n.text === 'Needed').length, 0);
   assert.equal(unavailable(shift), plan.am.length);
   assert.equal(buttons(shift, 'Need backup').length, 1);
   assert.equal(buttons(shift, 'Release backup').length, 0);
@@ -272,14 +272,16 @@ test('backup flow keeps primaries on the card and moves between needed, assigned
   assert.ok(find(shift, n => n.text === 'Choose a volunteer.').length);
   select.value = options[1].value;
   await buttons(shift, 'Assign')[0].events.click();
-  assert.ok(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length);
+  assert.ok(find(shift, n => n.text === 'Backup').length);
+  assert.equal(find(shift, n => n.text === 'Needed').length, 0);
   assert.equal(buttons(shift, 'Need backup').length, 1);
   assert.equal(buttons(shift, 'Release backup').length, 1);
   shift = signIn({ id: plan.am[0], name: plan.am[0], roles: ['volunteer'] });
   assert.equal(buttons(shift, 'Need backup').length, 0);
   await buttons(shift, 'Release backup')[0].events.click();
   assert.equal(unavailable(shift), 0);
-  assert.equal(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length, 0);
+  assert.equal(find(shift, n => n.text === 'Backup').length, 0);
+  assert.equal(find(shift, n => /BACKUP/.test(n.text || '')).length, 0);
   assert.equal(buttons(shift, 'Need backup').length, 1);
   buttons(shift, 'Need backup')[0].events.click();
   await find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0].events.submit({ preventDefault() {} });
@@ -407,7 +409,8 @@ test('contact actions cover current schedules, backups, recurring assignments an
   context.applyVolunteerSchedule(); context.renderRecurring();
   assert.equal(links(nodes['backup-list']).length,4);
   assert.equal(links(nodes['recurring-body']).length,4);
-  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,4);
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,3);
+  assert.equal(find(context.renderScheduledShift(today,'am',[person.name],today),n=>n.tag==='a'&&/^mailto:/.test(n.href||'')).length,0);
   assert.equal(links(context.renderScheduledShift(yesterday,'am',[person.name],today)).length,0);
   const entry={who:person.name,volunteerId:person.id,date:today,time:new Date().toISOString()};
   assert.equal(links(context.renderUpdate(entry)).length,4);
@@ -415,7 +418,7 @@ test('contact actions cover current schedules, backups, recurring assignments an
   assert.equal(links(context.renderUpdate(entry,true)).length,0);
   context.sharedBackups[today+':am']={status:'assigned',requestedBy:{id:person.id,name:person.name},backup:{id:'other',name:'Another Mtj'}};
   context.volunteerDirectory.push({...person,id:'other',name:'Another Mtj'});
-  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,8);
+  assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,6);
   // Ambiguous names must not accidentally expose another person's contact information.
   context.volunteerDirectory.push({...person,id:'duplicate'});
   assert.equal(links(context.volunteerIdentity(person.name)).length,0);

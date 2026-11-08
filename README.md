@@ -80,8 +80,7 @@ Only the current state is kept (no backup history).
 - **Need backup** (a primary on the shift, coordinator, admin, super-admin): all primaries are
   marked unavailable and the Backup slot shows Needed. An optional note can be added.
 - **Offer to cover** (any signed-in volunteer who is not a primary on that shift) or **Assign**
-  (coordinator or admin picks a volunteer): the Backup slot shows that name and the card
-  shows Backup confirmed.
+  (coordinator or admin picks a volunteer): the Backup slot shows that name (the card turns green).
 - **Need backup** again (the current backup, coordinator or admin): the slot returns to Needed.
 - **Cancel need for backup** (primaries, coordinators, admins): needed becomes no request.
 - **Release backup** (primaries, coordinators, admins): assigned becomes no request and the
