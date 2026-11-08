@@ -1,5 +1,7 @@
 # Temple Laundry Schedule
 
+Documentation: [docs/workflows.md](docs/workflows.md) describes every workflow, role and rule; [docs/backup-workflow.md](docs/backup-workflow.md) specifies the backup workflow. AI tools should also read `AGENTS.md`.
+
 A one-page, mobile-friendly website for the Sri Radha Kalachandji Temple laundry volunteers.
 Everyone can see who is on each morning and evening shift for yesterday, today, and the next six days, with
 today highlighted, the permanent backups, and any planned absences. The page also has a

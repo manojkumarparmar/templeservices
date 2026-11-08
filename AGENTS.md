@@ -2,6 +2,37 @@
 
 Read `PROJECT_MEMORY.md` for the complete November 1, 2026 session record, deployed behavior, migration history, verification limits, and follow-ups. Read live D1 records for current people and assignments; do not reseed them from a historical roster.
 
+## Start here (read before changing anything)
+
+This site runs a temple laundry seva: volunteers, recurring shifts, notes, backup cover. The
+rules and logic are written down; do not infer them from the UI alone.
+
+1. `docs/workflows.md` is the map of every workflow: roles and permissions, sign-in, schedule view,
+   notes and photos, recurring schedule, volunteer directory, past shifts, contacts, data model,
+   hosting and testing, plus a checklist for changing a workflow.
+2. `docs/backup-workflow.md` is the full specification of the backup (Need backup) workflow: states,
+   actions, who may do each, storage, API and card display.
+3. `PROJECT_MEMORY.md` is the dated session history (what was done, why, live-data facts, and
+   verification limits). `README.md` covers setup and deployment.
+
+Working rules for any AI tool or developer:
+
+- The server is the source of truth for permissions (`server/api.mjs`, `server/volunteers.mjs`).
+  Never rely on hidden buttons. Change the server first, then the page, then tests.
+- When behavior changes, update `docs/workflows.md` (and `docs/backup-workflow.md` for backup), the
+  tests, and this file in the same change. If code and docs disagree, tell the owner rather than
+  silently picking one.
+- Live D1 data is authoritative and is edited through the website. Never reseed volunteers, never
+  reapply migrations 0001 to 0006, and add a new forward migration for any schema change.
+- Service dates use America/Chicago. Shifts are `am`/`pm`; weekdays are Monday 0 to Sunday 6.
+- Run `node --test tests/*.test.mjs` and `node scripts/build.mjs` before pushing. Pushing to `main`
+  deploys to production, so state accurately whether work is local, pushed, or deployed, and do not
+  push to `main` without the owner's go-ahead unless they have asked you to.
+- Keep interface copy short. Do not reintroduce explanatory filler the owner removed.
+- Never store credentials, tokens, OTPs or private keys in files, logs or chat output.
+
+## Project facts
+
 - Repository: https://github.com/manojkumarparmar/templeservices
 - Production website: https://templeservices.pages.dev/
 - Hosting: Cloudflare Pages project `templeservices`, production branch `main`. Pushes to main trigger deployment. Preserve this hosting arrangement; do not create a replacement Sites project.
