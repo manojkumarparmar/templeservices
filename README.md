@@ -69,6 +69,8 @@ is ignored. Only the remembered volunteer name remains in browser storage.
 
 ## Backup requests
 
+Full workflow design (states, permissions, storage, display): [docs/backup-workflow.md](docs/backup-workflow.md).
+
 Shift action buttons are hidden until sign-in. Add/Edit Notes is available only
 for yesterday and today. Backup actions are available for today and the next six days.
 The server enforces every permission below.
