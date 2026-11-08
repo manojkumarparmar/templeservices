@@ -182,6 +182,34 @@ is displayed as a compact Monday to Sunday table below Permanent backups.
 - **Effect on dates**: changes apply to today and future dates. Past dates keep the plan that was
   in force (see section 10).
 
+### Planned dates (dated primaries)
+
+A **dated plan** sets the primaries for one shift on one date. It replaces the weekly primaries
+for that shift and date only; every other date follows the weekly plan.
+
+- **Rule**: for each date and shift, use the dated plan if one exists, otherwise the weekly plan.
+  `readSchedule` applies it, so schedule cards, history and the client all see the same primaries.
+  `isPrimaryOn` applies it to backup permissions (a weekly person is not a primary on a replaced
+  date, and a planned person is).
+- **Replace, not add/remove**: a dated plan is the full list of primaries. An empty list is a valid
+  explicit "no one planned" date.
+- **Who and when**: coordinators, admins and the super-admin only. Dates run from today up to 90
+  days ahead, at most 30 dates per save. Volunteers must be active.
+- **UI**: the "Planned dates" list sits under the weekly table (visible to everyone, with the weekly
+  names for comparison). Managers get **Plan dates** (shift, dates added one by one or repeated
+  weekly for 2 to 12 weeks, volunteers), and **Edit** and **Remove** on each row. Managers also see
+  a "Planned date" tag on shift cards.
+- **API**: `GET /api/planned` (upcoming plans), `POST /api/planned/save`
+  `{shift, dates[], volunteerIds[]}` (upsert for each date, atomic), `POST /api/planned/remove`
+  `{shift, date}`. `GET /api/schedule` adds `planned` (`"date:shift": true`) for managers only.
+- **Open backup requests**: saving or removing a plan for a date whose backup is `needed` or
+  `assigned` is rejected (409). Cancel or release the request first.
+- **Storage**: table `planned_shifts` (migration 0007), one row per date and shift with
+  `people_json` snapshots. Rows are never deleted by the app except through Remove, so history keeps
+  them. For today and future dates names are read live and deactivated volunteers are dropped; for
+  past dates the stored snapshot is shown.
+- **Before the migration is applied**, the API treats the table as empty so the site keeps working.
+
 ## 9. Volunteer directory (profiles)
 
 The Volunteers tab lists active volunteers as wide row cards: name and roles, recurring service
@@ -240,6 +268,7 @@ email address is not shown on shift cards (it still appears in places such as di
 | `load_updates`, `update_photos` | Shift notes, checklists, photo keys (soft delete, versions, operation ids) |
 | `shift_backups` | One row per date and shift: current backup state and version |
 | `schedule_versions` | Recorded recurring plans for historical lookups (trigger-maintained) |
+| `planned_shifts` | Dated primaries that replace the weekly plan for one shift on one date |
 
 Migrations (`migrations/0001` to `0006`) are already applied in production, some by direct
 `wrangler d1 execute`, so there is no reliable migrations tracking table. **Never reapply them**.

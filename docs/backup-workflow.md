@@ -17,8 +17,9 @@ Code map:
 ## Terms
 
 - **Shift**: one service date plus Morning (`am`) or Evening (`pm`).
-- **Primaries**: the volunteers assigned to that weekday and shift in the recurring schedule.
-  They are derived, never stored per day. A shift can have several primaries or none.
+- **Primaries**: the volunteers assigned to that weekday and shift in the recurring schedule, or
+  the dated plan for that date and shift when one exists (`planned_shifts`). They are derived,
+  never stored per day. A shift can have several primaries or none.
 - **Manager**: a super-admin, admin, or coordinator.
 - **Backup**: the one volunteer currently covering a shift whose primaries are unavailable.
 - **Requester**: the person who pressed Need backup.

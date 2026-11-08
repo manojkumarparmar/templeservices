@@ -48,6 +48,7 @@ async function fixture() {
         })));
         return Response.json({volunteers:[...roster.values()]});
       }
+      if (path === '/api/planned') return Response.json({ today: '2026-11-08', planned: [] });
       if (!options.body) return Response.json({ assignments: {}, updates, backups });
       const data = JSON.parse(options.body);
       if (path === '/api/updates') {
@@ -500,4 +501,36 @@ test('Google sign-in uses configured client and nonce and submits credentials to
   context.api=async ()=>{throw new Error('Please ask an administrator to add your email to the volunteer list.');};
   user=null; await settings.callback({credential:'unapproved-token'});
   assert.equal(user,null); assert.match(nodes['auth-status'].textContent || nodes['auth-status'].text,/administrator/);
+});
+
+test('planned dates list is visible to everyone and only managers can plan, edit or remove', async () => {
+  const {nodes,context} = await fixture();
+  context.plannedList=[{date:'2026-11-12',shift:'am',people:[{id:'x',name:'Divya'}]},{date:'2026-11-23',shift:'pm',people:[]}];
+  context.renderPlanned();
+  assert.equal(nodes['planned-list'].children.length,2);
+  assert.equal(nodes['planned-empty'].hidden,true);
+  assert.equal(nodes['plan-dates'].hidden,true);
+  assert.equal(find(nodes['planned-list'],n=>n.tag==='button').length,0);
+  context.currentUser={id:'coordinator',roles:['coordinator']}; context.updateAccount();
+  assert.equal(nodes['plan-dates'].hidden,false);
+  assert.equal(find(nodes['planned-list'],n=>n.tag==='button').length,4);
+  assert.ok(find(nodes['planned-list'],n=>n.text==='No one planned').length===1);
+});
+
+test('plan dates form collects dates and volunteers and saves them', async () => {
+  const {nodes,context} = await fixture();
+  context.currentUser={id:'coordinator',roles:['coordinator']}; context.updateAccount();
+  nodes['plan-dates'].events.click();
+  assert.equal(nodes['planned-form'].hidden,false);
+  nodes['planned-date'].value='2026-11-26'; nodes['planned-weeks'].value='3'; nodes['planned-add-weeks'].events.click();
+  assert.deepEqual([...context.plannedDraft.dates].sort(),['2026-11-26','2026-12-03','2026-12-10']);
+  const boxes=find(nodes['planned-people'],n=>n.type==='checkbox'); assert.ok(boxes.length>0);
+  boxes[0].checked=true; boxes[0].events.change();
+  assert.equal(context.plannedDraft.ids.length,1);
+  await nodes['planned-form'].events.submit({preventDefault(){}});
+  assert.equal(context.plannedDraft,null);
+  assert.equal(nodes['planned-form'].hidden,true);
+  nodes['plan-dates'].events.click();
+  await nodes['planned-form'].events.submit({preventDefault(){}});
+  assert.equal(nodes['planned-status'].text,'Add at least one date.');
 });

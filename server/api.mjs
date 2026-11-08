@@ -63,10 +63,16 @@ async function readSchedule(url, env, user) {
     const weekday = (new Date(day+'T12:00:00Z').getUTCDay()+6)%7;
     assignments[day] = row ? Object.fromEntries(['am','pm'].map(shift=>[shift,JSON.parse(row.people_json).filter(v=>v.assignments.some(a=>a.weekday===weekday && a.shift===shift)).map(v=>({id:v.id,name:v.name}))])) : null;
   }
+  const planned = await plannedBetween(env, from, to);
+  const active = new Map((await env.DB.prepare('SELECT id,name FROM volunteers WHERE active=1').all()).results.map(v => [v.id, v.name]));
+  for (const row of planned) {
+    if (!assignments[row.service_date]) continue;
+    assignments[row.service_date][row.shift] = plannedPeople(row, row.service_date >= today() ? active : null);
+  }
   const updates = await env.DB.prepare('SELECT * FROM load_updates WHERE deleted_at IS NULL AND service_date BETWEEN ? AND ? ORDER BY created_at DESC, id DESC').bind(from, to).all();
   const photos = await env.DB.prepare('SELECT p.* FROM update_photos p JOIN load_updates u ON p.update_id = u.id WHERE u.service_date BETWEEN ? AND ? ORDER BY p.object_key').bind(from, to).all();
   const backups = await env.DB.prepare('SELECT * FROM shift_backups WHERE service_date BETWEEN ? AND ?').bind(from, to).all();
-  return json({ today: today(), assignments, updates: updates.results.map(row => rowUpdate(row, photos.results.filter(p => p.update_id === row.id))), backups: Object.fromEntries(backups.results.map(row => [row.service_date + ':' + row.shift, { ...backupState(JSON.parse(row.state_json)), version: row.version }])) });
+  return json({ today: today(), assignments, ...(user && isManager(user) ? { planned: Object.fromEntries(planned.map(row => [row.service_date + ':' + row.shift, true])) } : {}), updates: updates.results.map(row => rowUpdate(row, photos.results.filter(p => p.update_id === row.id))), backups: Object.fromEntries(backups.results.map(row => [row.service_date + ':' + row.shift, { ...backupState(JSON.parse(row.state_json)), version: row.version }])) });
 }
 async function saveUpdate(data, env, user) {
   const day = date(data.date), nowDay = today();
@@ -145,6 +151,61 @@ function backupState(raw) {
   if (!raw.person) return { status: 'none' };
   return { status: raw.cover ? 'assigned' : 'needed', requestedBy: { id: raw.requestedBy || null, name: raw.person }, requestedAt: raw.requestedAt, notes: raw.notes || '', backup: raw.cover ? { id: raw.coveredBy || null, name: raw.cover } : null };
 }
+// Dated plans replace the weekly primaries for one shift on one date. Future dates use live names and drop deactivated volunteers.
+// Until migration 0007 is applied the table is missing; the schedule then simply has no dated plans.
+const noTable = error => /no such table/i.test(String(error?.message || error));
+async function plannedBetween(env, from, to) {
+  try { return (await env.DB.prepare('SELECT * FROM planned_shifts WHERE service_date BETWEEN ? AND ? ORDER BY service_date, shift').bind(from, to).all()).results; }
+  catch (error) { if (noTable(error)) return []; throw error; }
+}
+function plannedPeople(row, active) {
+  const people = JSON.parse(row.people_json);
+  if (!active) return people;
+  return people.filter(p => active.has(p.id)).map(p => ({ id: p.id, name: active.get(p.id) }));
+}
+async function isPrimaryOn(env, person, day, shift) {
+  let row = null;
+  try { row = await env.DB.prepare('SELECT people_json FROM planned_shifts WHERE service_date = ? AND shift = ?').bind(day, shift).first(); }
+  catch (error) { if (!noTable(error)) throw error; }
+  if (row) return JSON.parse(row.people_json).some(p => p.id === person.id);
+  return isPrimary(person, day, shift);
+}
+const PLAN_DAYS = 90;
+async function listPlanned(env) {
+  const from = today(), rows = await plannedBetween(env, from, addDays(from, PLAN_DAYS));
+  const active = new Map((await env.DB.prepare('SELECT id,name FROM volunteers WHERE active=1').all()).results.map(v => [v.id, v.name]));
+  return json({ today: from, planned: rows.map(row => ({ date: row.service_date, shift: row.shift, people: plannedPeople(row, active) })) });
+}
+async function savePlanned(data, env, user, remove) {
+  reject(!isManager(user), 'Only a coordinator or administrator can plan dates.', 403);
+  const nowDay = today(), last = addDays(nowDay, PLAN_DAYS);
+  reject(!['am', 'pm'].includes(data.shift), 'Invalid shift.');
+  const dates = remove ? [date(data.date)] : data.dates;
+  reject(!Array.isArray(dates) || !dates.length || dates.length > 30, 'Choose between one and 30 dates.');
+  const days = [...new Set(dates.map(date))].sort();
+  reject(days.some(day => day < nowDay || day > last), 'Plan dates from today up to ' + PLAN_DAYS + ' days ahead.');
+  let people = [];
+  if (!remove) {
+    reject(!Array.isArray(data.volunteerIds) || data.volunteerIds.length > 20 || new Set(data.volunteerIds).size !== data.volunteerIds.length, 'Choose volunteers for this shift.');
+    for (const id of data.volunteerIds) {
+      reject(typeof id !== 'string', 'Choose volunteers for this shift.');
+      const found = await env.DB.prepare('SELECT id,name FROM volunteers WHERE id = ? AND active = 1').bind(id).first();
+      reject(!found, 'A selected volunteer is not available.');
+      people.push({ id: found.id, name: found.name });
+    }
+  }
+  const open = `COALESCE(json_extract(state_json,'$.status'), CASE WHEN json_extract(state_json,'$.person') IS NULL THEN 'none' ELSE 'needed' END) != 'none'`;
+  for (const day of days) {
+    const backup = await env.DB.prepare('SELECT state_json FROM shift_backups WHERE service_date = ? AND shift = ?').bind(day, data.shift).first();
+    reject(backup && backupState(JSON.parse(backup.state_json)).status !== 'none', 'A backup request is open for ' + day + '. Cancel or release it before changing this date.', 409);
+  }
+  const time = new Date().toISOString(), json_ = JSON.stringify(people);
+  const results = await env.DB.batch(days.map(day => remove
+    ? env.DB.prepare(`DELETE FROM planned_shifts WHERE service_date = ? AND shift = ? AND NOT EXISTS (SELECT 1 FROM shift_backups WHERE service_date = ? AND shift = ? AND ${open})`).bind(day, data.shift, day, data.shift)
+    : env.DB.prepare(`INSERT INTO planned_shifts (service_date, shift, people_json, updated_at, updated_by) SELECT ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM shift_backups WHERE service_date = ? AND shift = ? AND ${open}) ON CONFLICT(service_date, shift) DO UPDATE SET people_json = excluded.people_json, updated_at = excluded.updated_at, updated_by = excluded.updated_by`).bind(day, data.shift, json_, time, user.id, day, data.shift)));
+  reject(!remove && results.some(r => r.meta.changes !== 1), 'A backup request was opened while saving. Review the schedule and try again.', 409);
+  return json({ saved: true, dates: days.length });
+}
 const BACKUP_ACTIONS = ['request', 'offer', 'assign', 'reopen', 'cancel', 'release'];
 async function saveBackup(data, env, user) {
   const day = date(data.date), nowDay = today();
@@ -155,7 +216,7 @@ async function saveBackup(data, env, user) {
   const row = await env.DB.prepare('SELECT * FROM shift_backups WHERE service_date = ? AND shift = ?').bind(day, data.shift).first();
   const current = row ? backupState(JSON.parse(row.state_json)) : { status: 'none' };
   reject((row?.version || 0) !== data.version, 'This shift changed. Review the latest status and try again.', 409);
-  const manager = isManager(user), primary = isPrimary(user, day, data.shift), time = new Date().toISOString();
+  const manager = isManager(user), primary = await isPrimaryOn(env, user, day, data.shift), time = new Date().toISOString();
   let next;
   if (data.action === 'request') {
     reject(!manager && !primary, 'Only a volunteer assigned to this shift, a coordinator, or an administrator can request backup.', 403);
@@ -171,7 +232,7 @@ async function saveBackup(data, env, user) {
       person = profile(found);
     }
     reject(current.status !== 'needed', 'This shift is no longer waiting for a backup.', 409);
-    reject(isPrimary(person, day, data.shift), person.name + ' is already assigned to this shift.');
+    reject(await isPrimaryOn(env, person, day, data.shift), person.name + ' is already assigned to this shift.');
     next = { status: 'assigned', requestedBy: current.requestedBy, requestedAt: current.requestedAt, notes: current.notes || '', backup: { id: person.id, name: person.name }, assignedAt: time, assignedBy: user.id };
   } else if (data.action === 'reopen') {
     reject(!manager && current.backup?.id !== user.id, 'Only the current backup, a coordinator, or an administrator can ask for another backup.', 403);
@@ -203,6 +264,7 @@ export async function handleApi(request, env) {
       const photo = await env.PHOTOS.get(key); reject(!photo, 'Photo not found.', 404);
       return new Response(photo.body, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
     }
+    if (request.method === 'GET' && url.pathname === '/api/planned') return await listPlanned(env);
     reject(request.method !== 'POST', 'Not found.', 404);
     reject(request.headers.get('Origin') !== url.origin, 'Submit updates from this website.', 403);
     const data = await body(request);
@@ -221,6 +283,8 @@ export async function handleApi(request, env) {
       return json({deleted:true});
     }
     if (url.pathname === '/api/updates') return await saveUpdate(data, env, user);
+    if (url.pathname === '/api/planned/save') return await savePlanned(data, env, user, false);
+    if (url.pathname === '/api/planned/remove') return await savePlanned(data, env, user, true);
     if (url.pathname === '/api/backups') return await saveBackup(data, env, user);
     throw new HttpError(404, 'Not found.');
   } catch (error) {

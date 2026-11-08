@@ -61,6 +61,16 @@ h2, h3 { margin: 0; }
 .label svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 
 .backup-area { margin-top: 14px; padding-top: 28px; border-top: 1px solid var(--line); }
+.planned { border-top: 1px solid var(--line); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.planned-title { font-size: 15px; margin: 0; }
+.planned-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.planned-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.planned-list li:last-child { border-bottom: 0; }
+.planned-actions { display: flex; gap: 6px; }
+.planned-actions .btn-small { min-height: 36px; font-size: 13px; padding: 0 10px; }
+.planned .chip { background: var(--today-bg); color: var(--accent); }
+.planned #planned-empty:empty, #planned-empty[hidden] { display: none; }
+.planned-tag { font-size: 11px; font-weight: 600; border-radius: 4px; padding: 1px 6px; background: var(--warn-bg); color: var(--warn-fg); align-self: flex-start; }
 .recurring-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 14px; }
 .recurring-table th, .recurring-table td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 .recurring-table th:first-child { width: 24%; }
@@ -408,6 +418,25 @@ h1{font-size:30px}
       <div class="editor-actions" id="recurring-actions" hidden><button type="submit" class="btn-primary" style="padding-inline:16px" id="save-recurring">Save recurring schedule</button><button type="button" class="btn-outline" id="cancel-recurring">Cancel</button></div>
     </form>
     <p class="note" id="recurring-status" role="status" aria-live="polite"></p>
+    <div class="planned" id="planned-section">
+      <h3 class="planned-title">Planned dates</h3>
+      <p class="note">A planned date replaces the weekly volunteers for that shift on that date only. Every other date follows the weekly schedule.</p>
+      <ul class="planned-list" id="planned-list" aria-label="Planned dates"></ul>
+      <p class="note" id="planned-empty">No dates are planned.</p>
+      <button type="button" class="btn-small" id="plan-dates" aria-expanded="false" aria-controls="planned-form" hidden>Plan dates</button>
+      <form id="planned-form" class="form" hidden>
+        <label class="field">Shift<select id="planned-shift"><option value="am">Morning</option><option value="pm">Evening</option></select></label>
+        <div class="field">Dates
+          <div class="photo-row"><input type="date" id="planned-date" aria-label="Date to plan"><button type="button" class="btn-small" id="planned-add-date">Add date</button></div>
+          <div class="photo-row"><input type="number" id="planned-weeks" min="2" max="12" value="4" aria-label="Number of weeks" style="width:72px"><button type="button" class="btn-small" id="planned-add-weeks">Repeat weekly</button><span class="note">from the date above</span></div>
+          <div class="photo-row" id="planned-dates" aria-live="polite"></div>
+        </div>
+        <div class="field">Volunteers<div class="recurring-choices" id="planned-people"></div></div>
+        <p class="note">Leave everyone unchecked to plan that shift with no one assigned.</p>
+        <div class="editor-actions"><button type="submit" class="btn-primary" style="padding-inline:16px" id="save-planned">Save planned dates</button><button type="button" class="btn-outline" id="cancel-planned">Cancel</button></div>
+      </form>
+      <p class="note" id="planned-status" role="status" aria-live="polite"></p>
+    </div>
   </section>
 
   </div>
@@ -533,7 +562,7 @@ var MOON_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 
 
 /* Shared updates are stored in Cloudflare D1 and R2. */
 var renderedDay = null;
-var sharedAssignments = {}, sharedUpdates = [], sharedBackups = {}, sharedReady = false, syncing = false;
+var sharedAssignments = {}, sharedUpdates = [], sharedBackups = {}, sharedPlanned = {}, sharedReady = false, syncing = false;
 var sharedListeners = [];
 function templeToday() {
   var parts = new Intl.DateTimeFormat("en-US", {timeZone: "America/Chicago", year: "numeric", month: "2-digit", day: "2-digit"}).formatToParts(new Date());
@@ -553,7 +582,8 @@ async function syncShared(force) {
     try {
       var today = templeToday();
       var data = await api("schedule?from=" + iso(addDays(today, -1)) + "&to=" + iso(addDays(today, 6)));
-      sharedAssignments = data.assignments || {}; sharedUpdates = data.updates; sharedBackups = data.backups; sharedReady = true;
+      sharedAssignments = data.assignments || {}; sharedUpdates = data.updates; sharedBackups = data.backups; sharedPlanned = data.planned || {}; sharedReady = true;
+      if (typeof loadPlanned === "function") loadPlanned();
       if (renderedDay !== iso(today)) render();
       sharedListeners.forEach(function (listener) { listener(); });
       document.getElementById("sync-status").textContent = "Updates are shared with everyone. Refreshes automatically every 30 seconds.";
@@ -735,6 +765,7 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     if (savedPlan === null && state === "none") { schedule.textContent = ""; schedule.appendChild(el("div", "label", shiftKey === "am" ? "Morning" : "Evening")); }
     schedule.className = "shift-details";
     details.appendChild(schedule);
+    if (sharedPlanned[key]) details.appendChild(el("span", "planned-tag", "Planned date"));
     if (savedPlan === null) details.appendChild(el("div", "note", "Original assignment not recorded."));
     if (needed || assigned) {
       var slot = el("div", "slot-row");

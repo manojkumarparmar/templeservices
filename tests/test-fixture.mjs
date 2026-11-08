@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFile } from 'node:fs/promises';
 import { handleApi } from '../server/api.mjs';
 import { sha256 } from '../server/volunteers.mjs';
-const migrations = await Promise.all(['0001_shared_storage.sql', '0002_volunteers_auth.sql', '0003_volunteer_names.sql', '0004_phone_sign_in.sql', '0005_editable_notes.sql', '0006_schedule_history.sql'].map(file => readFile(new URL('../migrations/' + file, import.meta.url), 'utf8')));
+const migrations = await Promise.all(['0001_shared_storage.sql', '0002_volunteers_auth.sql', '0003_volunteer_names.sql', '0004_phone_sign_in.sql', '0005_editable_notes.sql', '0006_schedule_history.sql', '0007_planned_shifts.sql'].map(file => readFile(new URL('../migrations/' + file, import.meta.url), 'utf8')));
 const rawToken = 'a'.repeat(64), tokenHash = await sha256(rawToken);
 export function fixture(options = {}) {
   const db = new DatabaseSync(':memory:'); db.exec('PRAGMA foreign_keys=ON'); migrations.forEach(sql => db.exec(sql));
