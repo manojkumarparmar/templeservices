@@ -53,9 +53,8 @@ Session date: November 1, 2026, America/Chicago. This records work actually perf
 
 - Signed-out visitors can view the schedule but see no shift action buttons. The normal Sign in button remains.
 - Signed-in active volunteers can Add/Edit Notes only on yesterday/today shifts; no notes action on future shifts.
-- Need backup appears only today/future and only for that shift's currently assigned volunteer or any coordinator/admin/super-admin. A confirmed replacement can request another backup; the replaced original volunteer no longer qualifies solely from the original assignment.
-- Ordinary volunteers can request backup only in their own name. Privileged roles may request on behalf of others. Server enforces both assignment and date rules, not just button visibility.
-- Opt for backup on a pending request remains available to signed-in active volunteers. Existing backup version checks, repeated replacements and history remain intact.
+- Superseded Nov 8, 2026 (branch `backup-primary-backup-slots`): backup is now a primary/backup slot model. Primaries (recurring assignees) always stay on the card; Need backup (a primary, coordinator or admin) marks all primaries unavailable and opens a Backup slot ("Needed"). Any signed-in volunteer can Offer to cover (not a primary of that shift); coordinators/admins can Assign a chosen volunteer. The current backup (or a coordinator/admin) can tap Need backup to reopen the slot. Cancel need for backup (needed to none) and Release backup (assigned to none; primaries active again) are for primaries, coordinators and admins. No backup history is kept; only current status, requester, note and backup. Version checks stay. Old person/cover/history rows are mapped on read, no migration. Past shifts show a backup only if one was assigned (primaries struck through), otherwise primaries only.
+- The UI test fake DOM gained a classList stub and the button lookup matches icon buttons by title/aria-label; 17 UI tests had been failing since the Nov 3 icon change.
 - Recurring editor and volunteer profile actions keep their separate role restrictions.
 
 ## Authentication and Firebase

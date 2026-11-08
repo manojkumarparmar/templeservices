@@ -15,6 +15,7 @@ class Element {
   setAttribute(key, value) { this.attrs[key] = value; }
   getAttribute(key) { return this.attrs[key]; }
   addEventListener(key, handler) { this.events[key] = handler; }
+  get classList() { const node = this; return { toggle(name, on) { const names = new Set((node.className || '').split(/\s+/).filter(Boolean)); (on === undefined ? !names.has(name) : on) ? names.add(name) : names.delete(name); node.className = [...names].join(' '); } }; }
   focus() { this.focused = true; }
   contains(node) { return !!node && find(this, child => child === node).length > 0; }
   getBoundingClientRect() { return {left:280,top:550,bottom:594}; }
@@ -56,8 +57,16 @@ async function fixture() {
       }
       if (path === '/api/updates/delete') updates=updates.filter(u=>u.id!==data.id);
       if (path === '/api/backups') {
-        const key = data.date + ':' + data.shift;
-        backups[key] = data.action === 'request' ? { person: data.name, notes: data.notes, version: data.version + 1 } : { ...backups[key], cover: data.name, version: data.version + 1 };
+        const key = data.date + ':' + data.shift, current = backups[key] || { status: 'none' };
+        const by = { id: context.currentUser.id, name: context.currentUser.name };
+        const next = {
+          request: { status: 'needed', requestedBy: by, notes: data.notes || '', backup: null },
+          offer: { ...current, status: 'assigned', backup: by },
+          assign: { ...current, status: 'assigned', backup: { id: data.volunteerId, name: data.volunteerId } },
+          reopen: { ...current, status: 'needed', backup: null },
+          cancel: { status: 'none' }, release: { status: 'none' }
+        }[data.action];
+        backups[key] = { ...next, version: data.version + 1 };
         return Response.json({ state: backups[key] });
       }
       return Response.json({ saved: true });
@@ -69,7 +78,7 @@ async function fixture() {
   await vm.runInContext(html.match(/<script>([\s\S]*?)<\/script>/)[1], context);
   return { nodes, context, documentEvents, setFail(value) { fail = value; }, get updates() { return updates; } };
 }
-const buttons = (node, text) => find(node, n => n.tag === 'button' && n.text === text);
+const buttons = (node, text) => find(node, n => n.tag === 'button' && (n.text === text || n.title === text || String(n.attrs['aria-label'] || '').startsWith(text)));
 
 test('shift actions respect sign-in, dates, assignment and coordinator permissions', async () => {
   const {nodes,context}=await fixture();
@@ -221,22 +230,64 @@ test('shared load updates preserve drafts during refresh and render summaries af
   assert.equal(find(shift, n => n.className === 'entry').length, 1);
   assert.equal(f.updates[0].shift, 'am'); assert.equal(f.updates[0].loads.kitchen.washed, true);
 });
-test('backup changes use shared state while preserving laundry drafts', async () => {
-  const { nodes, context } = await fixture(); context.currentUser.roles=['coordinator']; context.render(); const shift = nodes.days.children[1].children[1];
+test('backup flow keeps primaries on the card and moves between needed, assigned and needed again', async () => {
+  const { nodes, context } = await fixture();
+  const plan = context.WEEKLY_PLAN[(context.templeToday().getDay() + 6) % 7];
+  const shiftFor = () => nodes.days.children[1].children[1];
+  const signIn = user => { context.currentUser = user; context.render(); return shiftFor(); };
+  const unavailable = shift => find(shift, n => /\bgone\b/.test(n.className || '')).length;
+  let shift = signIn({ id: plan.am[0], name: plan.am[0], roles: ['volunteer'] });
   const noteForm = find(shift, n => n.tag === 'form' && n.id.startsWith('update-'))[0];
   find(noteForm, n => n.tag === 'textarea')[0].value = 'Keep my draft';
-  let form = find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0];
-  find(form, n => n.type === 'text')[0].value = 'Original';
+  assert.equal(unavailable(shift), 0);
+  buttons(shift, 'Need backup')[0].events.click();
+  const form = find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0];
+  assert.equal(find(form, n => n.type === 'text').length, 0);
   await form.events.submit({ preventDefault() {} });
-  assert.equal(buttons(shift, 'Opt for backup').length, 1);
-  form = find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0];
-  find(form, n => n.type === 'text')[0].value = 'Replacement';
-  await form.events.submit({ preventDefault() {} });
-  assert.equal(buttons(shift, 'Need backup').length, 1);
-  assert.ok(find(shift, n => n.text === 'Replacement').length);
+  assert.ok(find(shift, n => n.text === '⚠ BACKUP NEEDED').length);
+  assert.ok(find(shift, n => n.text === 'Needed').length);
+  assert.equal(unavailable(shift), plan.am.length);
+  assert.equal(buttons(shift, 'Offer to cover').length, 0);
+  assert.equal(buttons(shift, 'Cancel need for backup').length, 1);
+  assert.equal(find(shift, n => n.tag === 'select').length, 0);
   assert.equal(find(noteForm, n => n.tag === 'textarea')[0].value, 'Keep my draft');
-  await context.syncShared();
-  assert.ok(find(shift, n => n.text === 'Replacement').length);
+  shift = signIn({ id: 'helper', name: 'Helper Mtj', roles: ['volunteer'] });
+  assert.equal(buttons(shift, 'Cancel need for backup').length, 0);
+  assert.equal(buttons(shift, 'Offer to cover').length, 1);
+  await buttons(shift, 'Offer to cover')[0].events.click();
+  assert.ok(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length);
+  assert.ok(find(shift, n => n.text === 'Helper Mtj').length);
+  assert.equal(unavailable(shift), plan.am.length);
+  assert.equal(buttons(shift, 'Need backup').length, 1);
+  assert.equal(buttons(shift, 'Release backup').length, 0);
+  await buttons(shift, 'Need backup')[0].events.click();
+  assert.ok(find(shift, n => n.text === 'Needed').length);
+  assert.equal(find(shift, n => n.text === 'Helper Mtj').length, 0);
+  shift = signIn({ id: 'coord', name: 'Coord Mtj', roles: ['coordinator'] });
+  assert.equal(buttons(shift, 'Cancel need for backup').length, 1);
+  const select = find(shift, n => n.tag === 'select')[0];
+  const options = find(select, n => n.tag === 'option');
+  assert.ok(options.length > 1 && !options.some(o => plan.am.includes(o.text)));
+  await buttons(shift, 'Assign')[0].events.click();
+  assert.ok(find(shift, n => n.text === 'Choose a volunteer.').length);
+  select.value = options[1].value;
+  await buttons(shift, 'Assign')[0].events.click();
+  assert.ok(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length);
+  assert.equal(buttons(shift, 'Need backup').length, 1);
+  assert.equal(buttons(shift, 'Release backup').length, 1);
+  shift = signIn({ id: plan.am[0], name: plan.am[0], roles: ['volunteer'] });
+  assert.equal(buttons(shift, 'Need backup').length, 0);
+  await buttons(shift, 'Release backup')[0].events.click();
+  assert.equal(unavailable(shift), 0);
+  assert.equal(find(shift, n => n.text === '✓ BACKUP CONFIRMED').length, 0);
+  assert.equal(buttons(shift, 'Need backup').length, 1);
+  buttons(shift, 'Need backup')[0].events.click();
+  await find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0].events.submit({ preventDefault() {} });
+  await buttons(shift, 'Cancel need for backup')[0].events.click();
+  assert.equal(unavailable(shift), 0);
+  assert.equal(buttons(shift, 'Need backup').length, 1);
+  shift = signIn(null);
+  assert.equal(buttons(shift, 'Need backup').length + buttons(shift, 'Offer to cover').length, 0);
 });
 
 test('three tabs work, public directory has no editing controls, and signed-out actions require sign-in', async () => {
@@ -292,6 +343,25 @@ test('signed-in history is read only, supports week navigation, and clears on si
 });
 
 
+test('history shows a backup only when one was assigned, with the primaries marked unavailable', async () => {
+  const {nodes,context}=await fixture();
+  const day=context.iso(context.addDays(context.templeToday(),-1));
+  const people=[{id:'a',name:'Asha Mtj'},{id:'b',name:'Bela Mtj'}];
+  const requestedBy={id:'a',name:'Asha Mtj'};
+  context.api=async()=>({assignments:{[day]:{am:people,pm:people}},updates:[],backups:{
+    [day+':am']:{status:'assigned',requestedBy,notes:'Travelling',backup:{id:'h',name:'Hema Mtj'},version:3},
+    [day+':pm']:{status:'needed',requestedBy,notes:'Never filled',backup:null,version:2}}});
+  nodes['history-date'].value=day;
+  nodes['view-history'].events.click(); await context.loadHistory();
+  const boxes=find(nodes['history-days'],n=>n.className==='shift');
+  const covered=boxes.filter(b=>find(b,n=>n.text==='Backup: Hema Mtj covered this shift.').length);
+  assert.equal(covered.length,1);
+  assert.equal(find(covered[0],n=>n.className==='gone').length,2);
+  assert.equal(find(nodes['history-days'],n=>n.className==='gone').length,2);
+  assert.equal(find(nodes['history-days'],n=>n.text==='Never filled').length,0);
+  assert.equal(find(nodes['history-days'],n=>/requested backup|previously/.test(n.text||'')).length,0);
+});
+
 test('verified phone with an unmatched profile resets the consumed code instead of retrying it', async () => {
   const {nodes,context} = await fixture();
   context.phoneConfirmation = {confirm: async () => ({user:{getIdToken:async ()=>'test-token'}})};
@@ -343,7 +413,7 @@ test('contact actions cover current schedules, backups, recurring assignments an
   assert.equal(links(context.renderUpdate(entry)).length,4);
   assert.equal(links(context.renderUpdate({...entry,date:yesterday})).length,0);
   assert.equal(links(context.renderUpdate(entry,true)).length,0);
-  context.sharedBackups[today+':am']={person:person.name,cover:'Another Mtj',coveredBy:'other'};
+  context.sharedBackups[today+':am']={status:'assigned',requestedBy:{id:person.id,name:person.name},backup:{id:'other',name:'Another Mtj'}};
   context.volunteerDirectory.push({...person,id:'other',name:'Another Mtj'});
   assert.equal(links(context.renderScheduledShift(today,'am',[person.name],today)).length,8);
   // Ambiguous names must not accidentally expose another person's contact information.

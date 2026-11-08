@@ -1,4 +1,4 @@
-import { AuthError, handlePeople, sessionUser } from './volunteers.mjs';
+import { AuthError, handlePeople, profile, sessionUser } from './volunteers.mjs';
 const MAX_BODY = 6 * 1024 * 1024;
 const LOADS = ['kitchen', 'pujari', 'deity'];
 const STAGES = ['washed', 'dried', 'folded'];
@@ -66,7 +66,7 @@ async function readSchedule(url, env, user) {
   const updates = await env.DB.prepare('SELECT * FROM load_updates WHERE deleted_at IS NULL AND service_date BETWEEN ? AND ? ORDER BY created_at DESC, id DESC').bind(from, to).all();
   const photos = await env.DB.prepare('SELECT p.* FROM update_photos p JOIN load_updates u ON p.update_id = u.id WHERE u.service_date BETWEEN ? AND ? ORDER BY p.object_key').bind(from, to).all();
   const backups = await env.DB.prepare('SELECT * FROM shift_backups WHERE service_date BETWEEN ? AND ?').bind(from, to).all();
-  return json({ today: today(), assignments, updates: updates.results.map(row => rowUpdate(row, photos.results.filter(p => p.update_id === row.id))), backups: Object.fromEntries(backups.results.map(row => [row.service_date + ':' + row.shift, { ...JSON.parse(row.state_json), version: row.version }])) });
+  return json({ today: today(), assignments, updates: updates.results.map(row => rowUpdate(row, photos.results.filter(p => p.update_id === row.id))), backups: Object.fromEntries(backups.results.map(row => [row.service_date + ':' + row.shift, { ...backupState(JSON.parse(row.state_json)), version: row.version }])) });
 }
 async function saveUpdate(data, env, user) {
   const day = date(data.date), nowDay = today();
@@ -133,27 +133,54 @@ async function saveUpdate(data, env, user) {
   await Promise.allSettled(oldPhotos.filter(key=>!retained.includes(key)).map(key=>env.PHOTOS.delete(key)));
   return json({ saved: true, id: data.id }, existing ? 200 : 201);
 }
+const MANAGER_ROLES = ['super-admin', 'admin', 'coordinator'];
+const isManager = person => !!person.isSuperAdmin || person.roles.some(role => MANAGER_ROLES.includes(role));
+function isPrimary(person, day, shift) {
+  const weekday = (new Date(day + 'T12:00:00Z').getUTCDay() + 6) % 7;
+  return person.assignments.some(a => a.weekday === weekday && a.shift === shift);
+}
+// Only the current backup state is kept. Older records (person/cover/history) are read in the same shape.
+function backupState(raw) {
+  if (raw.status) return raw;
+  if (!raw.person) return { status: 'none' };
+  return { status: raw.cover ? 'assigned' : 'needed', requestedBy: { id: raw.requestedBy || null, name: raw.person }, requestedAt: raw.requestedAt, notes: raw.notes || '', backup: raw.cover ? { id: raw.coveredBy || null, name: raw.cover } : null };
+}
+const BACKUP_ACTIONS = ['request', 'offer', 'assign', 'reopen', 'cancel', 'release'];
 async function saveBackup(data, env, user) {
   const day = date(data.date), nowDay = today();
   reject(day < nowDay || day > addDays(nowDay, 6), 'Backup requests are available for today and the next six days.');
-  reject(!['am', 'pm'].includes(data.shift) || !['request', 'offer'].includes(data.action), 'Invalid shift or action.');
-  const name = text(data.name, 60, true), notes = text(data.notes || '', 1000);
+  reject(!['am', 'pm'].includes(data.shift) || !BACKUP_ACTIONS.includes(data.action), 'Invalid shift or action.');
   reject(!Number.isInteger(data.version) || data.version < 0, 'Invalid backup version.');
+  const notes = text(data.notes || '', 1000);
   const row = await env.DB.prepare('SELECT * FROM shift_backups WHERE service_date = ? AND shift = ?').bind(day, data.shift).first();
-  const current = row ? JSON.parse(row.state_json) : null;
+  const current = row ? backupState(JSON.parse(row.state_json)) : { status: 'none' };
   reject((row?.version || 0) !== data.version, 'This shift changed. Review the latest status and try again.', 409);
-  const time = new Date().toISOString(); let next;
-  if (data.action === 'offer') {
-    reject(!current || current.cover, 'This shift is no longer waiting for a backup.', 409);
-    next = { ...current, cover: name, coveredAt: time, coveredBy: user.id };
+  const manager = isManager(user), primary = isPrimary(user, day, data.shift), time = new Date().toISOString();
+  let next;
+  if (data.action === 'request') {
+    reject(!manager && !primary, 'Only a volunteer assigned to this shift, a coordinator, or an administrator can request backup.', 403);
+    reject(current.status !== 'none', 'A backup has already been requested for this shift.', 409);
+    next = { status: 'needed', requestedBy: { id: user.id, name: user.name }, requestedAt: time, notes, backup: null };
+  } else if (data.action === 'offer' || data.action === 'assign') {
+    let person = user;
+    if (data.action === 'assign') {
+      reject(!manager, 'Only a coordinator or administrator can assign another volunteer.', 403);
+      reject(typeof data.volunteerId !== 'string' || !data.volunteerId, 'Choose a volunteer.');
+      const found = await env.DB.prepare('SELECT * FROM volunteers WHERE id = ? AND active = 1').bind(data.volunteerId).first();
+      reject(!found, 'That volunteer is not available.');
+      person = profile(found);
+    }
+    reject(current.status !== 'needed', 'This shift is no longer waiting for a backup.', 409);
+    reject(isPrimary(person, day, data.shift), person.name + ' is already assigned to this shift.');
+    next = { status: 'assigned', requestedBy: current.requestedBy, requestedAt: current.requestedAt, notes: current.notes || '', backup: { id: person.id, name: person.name }, assignedAt: time, assignedBy: user.id };
+  } else if (data.action === 'reopen') {
+    reject(!manager && current.backup?.id !== user.id, 'Only the current backup, a coordinator, or an administrator can ask for another backup.', 403);
+    reject(current.status !== 'assigned', 'This shift has no backup to replace.', 409);
+    next = { status: 'needed', requestedBy: current.requestedBy, requestedAt: current.requestedAt, notes: current.notes || '', backup: null };
   } else {
-    const managesShift = user.isSuperAdmin || user.roles.some(role=>['super-admin','admin','coordinator'].includes(role));
-    const weekday = (new Date(day+'T12:00:00Z').getUTCDay()+6)%7;
-    const assigned = current?.cover ? current.coveredBy === user.id : user.assignments.some(a=>a.weekday===weekday && a.shift===data.shift);
-    reject(!managesShift && !assigned, 'Only the assigned volunteer or a coordinator or administrator can request backup for this shift.',403);
-    reject(!managesShift && name !== user.name, 'You can request backup only for yourself.',403);
-    reject(current && !current.cover, 'A backup has already been requested for this shift.', 409);
-    next = { person: name, notes, requestedAt: time, requestedBy: user.id, wasBackup: !!current?.cover, history: current ? [...(current.history || []), { ...current, history: undefined }] : [] };
+    reject(!manager && !primary, 'Only a volunteer assigned to this shift, a coordinator, or an administrator can do this.', 403);
+    reject(current.status !== (data.action === 'cancel' ? 'needed' : 'assigned'), data.action === 'cancel' ? 'There is no open backup request to cancel.' : 'This shift has no backup to release.', 409);
+    next = { status: 'none' };
   }
   const result = row
     ? await env.DB.prepare('UPDATE shift_backups SET state_json = ?, version = version + 1, updated_at = ? WHERE service_date = ? AND shift = ? AND version = ?').bind(JSON.stringify(next), time, day, data.shift, data.version).run()

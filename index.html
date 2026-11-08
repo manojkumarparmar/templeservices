@@ -116,7 +116,6 @@ h2, h3 { margin: 0; }
 .shift-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 6px; flex: 0 0 auto; max-width: 52%; }
 .shift-actions .btn-small { padding: 0 10px; font-size: 13px; }
 .shift.backup-needed { background: var(--warn-bg); border-radius: 10px; padding: 12px; outline: 1px solid var(--warn-line); }
-.backup-needed .who { text-decoration: line-through; }
 .backup-form-area { width: 100%; }
 .backup-message { color: var(--warn-fg); font-size: 13px; overflow-wrap: anywhere; }
 .backup-confirmed { color: var(--cover-fg); font-size: 13px; }
@@ -349,6 +348,12 @@ h1{font-size:30px}
 .shift.backup-needed .backup-message{font-weight:700;color:var(--away-fg)}
 .shift.backup-confirmed-state{background:var(--cover-bg);outline:2px solid var(--cover-fg);border-radius:10px;padding:10px}
 .shift-status-banner{font-size:12px;font-weight:700;letter-spacing:.02em}
+.slot-label{font-size:12px;font-weight:600;color:var(--muted);margin-right:6px}
+.slot-row{display:flex;align-items:baseline;gap:2px;font-weight:600}
+.backup-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.backup-assign{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.backup-assign select{min-height:40px;max-width:100%;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);padding:0 8px}
+.backup-status:empty{display:none}
 .backup-needed .shift-status-banner{color:var(--away-fg)}
 .backup-confirmed-state .shift-status-banner{color:var(--cover-fg)}
 @media(max-width:600px){.shift-header{flex-wrap:nowrap}.shift-actions{max-width:none}}
@@ -587,7 +592,7 @@ function absencesFor(dateIso, shift, person) {
   });
 }
 
-function renderShift(dateIso, shiftKey, people) {
+function renderShift(dateIso, shiftKey, people, unavailable) {
   var box = el("div", "shift");
   var label = el("div", "label");
   label.innerHTML = (shiftKey === "am" ? SUN_SVG : MOON_SVG);
@@ -600,13 +605,14 @@ function renderShift(dateIso, shiftKey, people) {
     return box;
   }
   var who = el("div", "who");
+  if (unavailable) who.appendChild(el("span", "slot-label", "Primary "));
   var allAway = true;
   var covers = [];
   var notes = [];
   people.forEach(function (p, i) {
     var abs = absencesFor(dateIso, shiftKey, p);
     var span = volunteerIdentity(p, null, dateIso);
-    if (abs.length) span.className += " gone";
+    if (abs.length || unavailable) span.className += " gone";
     if (i > 0) who.appendChild(document.createTextNode(" & "));
     who.appendChild(span);
     if (abs.length) {
@@ -620,6 +626,7 @@ function renderShift(dateIso, shiftKey, people) {
   });
   box.appendChild(who);
   var anyAway = people.some(function (p) { return absencesFor(dateIso, shiftKey, p).length > 0; });
+  if (unavailable && !anyAway) box.appendChild(el("span", "chip away", "Unavailable"));
   if (anyAway) {
     box.appendChild(el("span", "chip away", "Away"));
     if (covers.length) box.appendChild(el("span", "chip cover", covers.join(" & ") + " covering"));
@@ -697,82 +704,119 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
   actions.appendChild(backupAction);
   var formArea = el("div", "backup-form-area"); shift.appendChild(formArea); shift.appendChild(updates);
   var key = dateIso + ":" + shiftKey;
+  var busy = false, message = "";
+  async function perform(action, extra, report) {
+    if (busy) return false;
+    busy = true; report("Saving…");
+    try {
+      var current = sharedBackups[key];
+      var result = await api("backups", Object.assign({date: dateIso, shift: shiftKey, action: action, version: current ? current.version : 0}, extra || {}));
+      sharedBackups[key] = result.state;
+    } catch (error) {
+      busy = false;
+      if (error.status === 409) { await syncShared(true); message = error.message + " The latest status is shown above."; refresh(); }
+      else report(error.message);
+      return false;
+    }
+    busy = false; message = ""; refresh();
+    var target = formArea.querySelector("button") || backupAction.querySelector("button");
+    if (target) target.focus(); else { details.tabIndex = -1; details.focus(); }
+    return true;
+  }
   function refresh() {
     var savedPlan = sharedAssignments[dateIso];
     if (savedPlan) people = savedPlan[shiftKey].map(function (v) { return v.name; });
     else if (savedPlan === null) people = [];
     var request = sharedBackups[key];
-    var pending = request && !request.cover;
-    shift.className = "shift" + (pending ? " backup-needed" : (request && request.cover ? " backup-confirmed-state" : ""));
+    var state = request && request.status ? request.status : "none";
+    var needed = state === "needed", assigned = state === "assigned";
+    shift.className = "shift" + (needed ? " backup-needed" : (assigned ? " backup-confirmed-state" : ""));
     details.textContent = ""; backupAction.textContent = ""; formArea.textContent = "";
-    var displayedPeople = request && request.cover ? [request.cover] : (request && request.wasBackup ? [request.person] : people);
-    var schedule = renderShift(dateIso, shiftKey, displayedPeople);
-    if (savedPlan === null && !request) { schedule.textContent=''; schedule.appendChild(el('div','label',shiftKey==='am'?'Morning':'Evening')); }
+    var schedule = renderShift(dateIso, shiftKey, people, needed || assigned);
+    if (savedPlan === null && state === "none") { schedule.textContent = ""; schedule.appendChild(el("div", "label", shiftKey === "am" ? "Morning" : "Evening")); }
     schedule.className = "shift-details";
     details.appendChild(schedule);
-    if (savedPlan === null) details.appendChild(el('div','note','Original assignment not recorded.'));
-    if (request) {
-      if (request.cover) {
-        details.appendChild(el("div", "shift-status-banner", "✓ BACKUP CONFIRMED"));
-        details.appendChild(el("span", "chip cover", "Backup volunteer"));
-        details.appendChild(el("div", "note", "Covering for " + request.person + ". Originally scheduled: " + (people.join(" & ") || "Unassigned") + "."));
-      } else {
-        details.appendChild(el("div", "shift-status-banner", "⚠ BACKUP NEEDED — VOLUNTEER REQUIRED"));
-        details.appendChild(el("span", "chip need", "Needs backup"));
-        details.appendChild(el("div", "backup-message", request.person + (request.wasBackup ? " (backup volunteer) is unavailable. Another backup is needed." : " is unavailable. A backup volunteer is needed.")));
-      }
-      if (dateIso >= todayIso) {
-        var referenced = [request.person].concat(request.cover ? people : []);
-        referenced.filter(function (name, index) { return displayedPeople.indexOf(name) < 0 && referenced.indexOf(name) === index; }).forEach(function (name) { details.appendChild(volunteerIdentity(name, null, dateIso)); });
-      }
+    if (savedPlan === null) details.appendChild(el("div", "note", "Original assignment not recorded."));
+    if (needed || assigned) {
+      details.appendChild(el("div", "shift-status-banner", assigned ? "✓ BACKUP CONFIRMED" : "⚠ BACKUP NEEDED"));
+      var slot = el("div", "slot-row");
+      slot.appendChild(el("span", "slot-label", "Backup"));
+      if (assigned) slot.appendChild(volunteerIdentity(request.backup.name, request.backup.id, dateIso));
+      else slot.appendChild(el("span", "backup-message", "Needed"));
+      details.appendChild(slot);
+      if (request.requestedBy && request.requestedBy.name) details.appendChild(el("div", "note", "Requested by " + request.requestedBy.name + "."));
       if (request.notes) details.appendChild(el("div", "note", request.notes));
     }
     if (!currentUser || dateIso < todayIso) return;
-    var managesShift = currentUser.isSuperAdmin || currentUser.roles.some(function (role) { return ['super-admin','admin','coordinator'].indexOf(role) >= 0; });
-    var assigned = request && request.cover ? request.coveredBy === currentUser.id : people.indexOf(currentUser.name) >= 0;
-    if (!pending && !managesShift && !assigned) return;
-    var button = el("button", pending ? "btn-small" : "btn-small icon-action", pending ? "Opt for backup" : ""); button.type = "button"; button.disabled = !sharedReady;
-    if (!pending) { button.innerHTML = shiftIcon("hand"); button.setAttribute("aria-label", "Request backup for " + dateIso + " " + shiftKey); button.title = "Need backup"; }
-    button.setAttribute("aria-expanded", "false");
-    var formId = "backup-" + key.replace(":", "-"); button.setAttribute("aria-controls", formId);
-    backupAction.appendChild(button);
-    var form = el("form", "form load-form"); form.id = formId; form.hidden = true;
-    form.appendChild(el("strong", null, pending ? "Volunteer as backup" : "Request a backup"));
-    var label = el("label", "field", pending ? "Backup volunteer's name" : "Name of person who is unavailable");
-    var name = el("input"); name.type = "text"; name.maxLength = 60; name.required = true;
-    name.value = pending ? (currentUser ? currentUser.name : "") : (request && request.cover ? request.cover : (people.length === 1 ? people[0] : ""));
-    if (!pending && !managesShift) { name.value = currentUser.name; name.readOnly = true; }
-    label.appendChild(name); form.appendChild(label);
-    var notes = el("textarea"); notes.rows = 3; notes.maxLength = 1000;
-    if (!pending) { var notesLabel = el("label", "field", "Notes (optional)"); notesLabel.appendChild(notes); form.appendChild(notesLabel); }
-    form.appendChild(el("p", "note", "Your request or offer will be visible to everyone using this schedule."));
-    var row = el("div", "photo-row");
-    var submit = el("button", "btn-primary", pending ? "Confirm backup" : "Submit request"); submit.type = "submit";
-    var cancel = el("button", "btn-outline", "Cancel"); cancel.type = "button";
-    row.appendChild(submit); row.appendChild(cancel); form.appendChild(row);
-    var status = el("div", "note"); status.setAttribute("role", "status"); form.appendChild(status); formArea.appendChild(form);
-    button.addEventListener("click", function () { if (!requireSignIn()) return; form.hidden = !form.hidden; button.setAttribute("aria-expanded", String(!form.hidden)); if (!form.hidden) name.focus(); });
-    cancel.addEventListener("click", function () { form.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); });
-    form.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      if (!name.value.trim()) { status.textContent = "Please enter a name."; name.focus(); return; }
-      if (submit.disabled) return;
-      submit.disabled = true; status.textContent = "Saving…";
-      try {
-        var result = await api("backups", {date: dateIso, shift: shiftKey, action: pending ? "offer" : "request", name: name.value.trim(), notes: notes.value.trim(), version: request ? request.version : 0});
-        sharedBackups[key] = result.state;
-      } catch (error) {
-        status.textContent = error.message;
-        if (error.status === 409) { await syncShared(true); status.textContent = error.message + " Close this form to review the latest status."; }
-        submit.disabled = false; return;
+    var manager = currentUser.isSuperAdmin || currentUser.roles.some(function (role) { return ['super-admin','admin','coordinator'].indexOf(role) >= 0; });
+    var primary = people.indexOf(currentUser.name) >= 0;
+    var isBackup = assigned && !!request.backup && request.backup.id === currentUser.id;
+    var row = el("div", "backup-actions");
+    var status = el("div", "note backup-status"); status.setAttribute("role", "status"); status.textContent = message;
+    function report(text) { message = text; status.textContent = text; }
+    function actionButton(label, action, extra) {
+      var b = el("button", "btn-small", label); b.type = "button"; b.disabled = !sharedReady;
+      b.addEventListener("click", function () { if (!requireSignIn()) return; return perform(action, extra, report); });
+      row.appendChild(b); return b;
+    }
+    if (state === "none" && (manager || primary)) {
+      var button = el("button", "btn-small icon-action", ""); button.type = "button"; button.disabled = !sharedReady;
+      button.innerHTML = shiftIcon("hand"); button.setAttribute("aria-label", "Request backup for " + dateIso + " " + shiftKey); button.title = "Need backup";
+      button.setAttribute("aria-expanded", "false");
+      var formId = "backup-" + key.replace(":", "-"); button.setAttribute("aria-controls", formId);
+      backupAction.appendChild(button);
+      var form = el("form", "form load-form"); form.id = formId; form.hidden = true;
+      form.appendChild(el("strong", null, "Need backup"));
+      var notesLabel = el("label", "field", "Notes (optional)");
+      var notes = el("textarea"); notes.rows = 3; notes.maxLength = 1000; notesLabel.appendChild(notes); form.appendChild(notesLabel);
+      form.appendChild(el("p", "note", "Everyone assigned to this shift is marked unavailable, and your request is visible to everyone using this schedule."));
+      var buttonRow = el("div", "photo-row");
+      var submit = el("button", "btn-primary", "Submit request"); submit.type = "submit";
+      var cancel = el("button", "btn-outline", "Cancel"); cancel.type = "button";
+      buttonRow.appendChild(submit); buttonRow.appendChild(cancel); form.appendChild(buttonRow);
+      var formStatus = el("div", "note"); formStatus.setAttribute("role", "status"); form.appendChild(formStatus);
+      formArea.appendChild(form);
+      button.addEventListener("click", function () { if (!requireSignIn()) return; form.hidden = !form.hidden; button.setAttribute("aria-expanded", String(!form.hidden)); if (!form.hidden) notes.focus(); });
+      cancel.addEventListener("click", function () { form.hidden = true; button.setAttribute("aria-expanded", "false"); button.focus(); });
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if (submit.disabled) return;
+        submit.disabled = true;
+        var ok = await perform("request", {notes: notes.value.trim()}, function (text) { formStatus.textContent = text; });
+        if (!ok) submit.disabled = false;
+      });
+      return;
+    }
+    if (needed) {
+      if (!primary) actionButton("Offer to cover", "offer");
+      if (primary || manager) actionButton("Cancel need for backup", "cancel");
+      formArea.appendChild(row);
+      if (manager) {
+        var assign = el("div", "backup-assign");
+        var select = el("select"); select.setAttribute("aria-label", "Choose a backup volunteer");
+        var first = el("option", null, "Choose a volunteer"); first.value = ""; select.appendChild(first);
+        volunteerDirectory.filter(function (v) { return v.active && people.indexOf(v.name) < 0; })
+          .sort(function (a, b) { return a.name.localeCompare(b.name); })
+          .forEach(function (v) { var option = el("option", null, v.name); option.value = v.id; select.appendChild(option); });
+        var assignButton = el("button", "btn-small", "Assign"); assignButton.type = "button"; assignButton.disabled = !sharedReady;
+        assignButton.addEventListener("click", function () {
+          if (!select.value) { report("Choose a volunteer."); return; }
+          return perform("assign", {volunteerId: select.value}, report);
+        });
+        assign.appendChild(select); assign.appendChild(assignButton); formArea.appendChild(assign);
       }
-      refresh();
-      var focusTarget = backupAction.querySelector("button");
-      if (focusTarget) focusTarget.focus();
-      else { details.tabIndex = -1; details.focus(); }
-    });
+    } else if (assigned) {
+      if (isBackup || manager) actionButton("Need backup", "reopen");
+      if (primary || manager) actionButton("Release backup", "release");
+      formArea.appendChild(row);
+    }
+    formArea.appendChild(status);
   }
-  sharedListeners.push(function () { var open = formArea.querySelector("form"); if (!open || open.hidden) refresh(); });
+  sharedListeners.push(function () {
+    var open = formArea.querySelector("form"); if (open && !open.hidden) return;
+    var chooser = formArea.querySelector("select"); if (chooser && chooser.value) return;
+    message = ""; refresh();
+  });
   refresh();
   return shift;
 }
@@ -1021,14 +1065,21 @@ async function loadHistory() {
       ['am','pm'].forEach(function (shift) {
         var plan = data.assignments[day], saved = plan && plan[shift], backup = data.backups[day+':'+shift];
         var box = el('div','shift');
-        var names = backup && backup.cover ? [backup.cover] : (saved ? saved.map(function(v){return v.name;}) : []);
+        var names = saved ? saved.map(function(v){return v.name;}) : [];
+        var covered = backup && backup.status === 'assigned' && backup.backup;
         box.appendChild(el('div','label',shift==='am'?'Morning':'Evening'));
-        box.appendChild(el('div','who',names.length?names.join(' & '):(plan?'Unassigned':'Unknown')));
+        var who = el('div','who');
+        if (names.length) {
+          names.forEach(function (name, index) {
+            if (index) who.appendChild(document.createTextNode(' & '));
+            who.appendChild(el('span', covered ? 'gone' : null, name));
+          });
+        } else who.textContent = plan ? 'Unassigned' : 'Unknown';
+        box.appendChild(who);
         if (!plan) box.appendChild(el('div','note','Original assignment not recorded.'));
-        if (backup) {
-          box.appendChild(el('div','note',backup.cover ? backup.cover+' covered for '+backup.person+'.' : backup.person+' requested backup; no replacement recorded.'));
+        if (covered) {
+          box.appendChild(el('div','note','Backup: '+backup.backup.name+' covered this shift.'));
           if (backup.notes) box.appendChild(el('div','note',backup.notes));
-          (backup.history || []).forEach(function (entry) { box.appendChild(el('div','note',entry.cover ? entry.cover+' previously covered for '+entry.person+'.' : entry.person+' previously requested backup.')); });
         }
         var entries = data.updates.filter(function(u){return u.date===day && u.shift===shift;});
         entries.forEach(function(entry){box.appendChild(renderUpdate(entry, true));});

@@ -70,18 +70,27 @@ is ignored. Only the remembered volunteer name remains in browser storage.
 ## Backup requests
 
 Shift action buttons are hidden until sign-in. Add/Edit Notes is available only
-for yesterday and today. Need backup is available only for today and future dates,
-and only to the currently assigned volunteer (including a confirmed replacement),
-coordinators, admins and the super-admin. The server enforces these permissions.
-Other signed-in active volunteers can use Opt for backup on a pending request.
+for yesterday and today. Backup actions are available for today and the next six days.
+The server enforces every permission below.
 
-Today and future shifts offer **Need backup**, collecting the unavailable person's name and
-optional notes. The shift is highlighted until someone uses **Opt for backup** and submits
-their name. The backup volunteer then replaces the scheduled name, with a backup label and
-the original assignment retained in the explanation. A confirmed backup can use **Need backup**
-again; the form starts with their name and reopens the shift for another volunteer. Prior
-backup assignments are retained in D1. Requests and offers are shared with everyone.
-Conditional version checks prevent two volunteers from claiming the same request.
+A shift's **primaries** are its recurring assignees; they always stay on the card.
+Each shift also has one **Backup** slot that is either empty, needed, or assigned.
+Only the current state is kept (no backup history).
+
+- **Need backup** (a primary on the shift, coordinator, admin, super-admin): all primaries are
+  marked unavailable and the Backup slot shows Needed. An optional note can be added.
+- **Offer to cover** (any signed-in volunteer who is not a primary on that shift) or **Assign**
+  (coordinator or admin picks a volunteer): the Backup slot shows that name and the card
+  shows Backup confirmed.
+- **Need backup** again (the current backup, coordinator or admin): the slot returns to Needed.
+- **Cancel need for backup** (primaries, coordinators, admins): needed becomes no request.
+- **Release backup** (primaries, coordinators, admins): assigned becomes no request and the
+  primaries are active again.
+
+Past shifts show a backup only when one was assigned (primaries struck through); otherwise
+only the primaries. Requests and offers are shared with everyone. Conditional version
+checks prevent two people from claiming the same slot. Older stored records are read as
+the current state, so no database migration is needed.
 
 ## Shared storage and publishing
 
