@@ -737,7 +737,6 @@ function renderScheduledShift(dateIso, shiftKey, people, todayIso) {
     details.appendChild(schedule);
     if (savedPlan === null) details.appendChild(el("div", "note", "Original assignment not recorded."));
     if (needed || assigned) {
-      if (needed) details.appendChild(el("div", "shift-status-banner", "⚠ BACKUP NEEDED"));
       var slot = el("div", "slot-row");
       slot.appendChild(el("span", "slot-label", "Backup"));
       if (assigned) slot.appendChild(volunteerIdentity(request.backup.name, request.backup.id, dateIso, true));

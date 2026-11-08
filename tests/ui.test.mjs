@@ -244,7 +244,7 @@ test('backup flow keeps primaries on the card and moves between needed, assigned
   const form = find(shift, n => n.tag === 'form' && n.id.startsWith('backup-'))[0];
   assert.equal(find(form, n => n.type === 'text').length, 0);
   await form.events.submit({ preventDefault() {} });
-  assert.ok(find(shift, n => n.text === '⚠ BACKUP NEEDED').length);
+  assert.equal(find(shift, n => /BACKUP/.test(n.text || '')).length, 0);
   assert.ok(find(shift, n => n.text === 'Needed').length);
   assert.equal(unavailable(shift), plan.am.length);
   assert.equal(buttons(shift, 'Offer to cover').length, 0);
