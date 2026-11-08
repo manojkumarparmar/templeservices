@@ -270,7 +270,7 @@ email address is not shown on shift cards (it still appears in places such as di
 | `schedule_versions` | Recorded recurring plans for historical lookups (trigger-maintained) |
 | `planned_shifts` | Dated primaries that replace the weekly plan for one shift on one date |
 
-Migrations (`migrations/0001` to `0006`) are already applied in production, some by direct
+Migrations (`migrations/0001` to `0007`) are already applied in production, some by direct
 `wrangler d1 execute`, so there is no reliable migrations tracking table. **Never reapply them**.
 Inspect the real schema first and add a new forward migration (`0007_...`) for any change. The
 seed in `0002` must never be run against live data.
