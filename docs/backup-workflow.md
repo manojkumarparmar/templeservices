@@ -8,7 +8,7 @@ Code map:
 
 | Concern | Where |
 | --- | --- |
-| Rules, permissions, storage | `saveBackup`, `backupState`, `isManager`, `isPrimary` in `server/api.mjs` |
+| Rules, permissions, storage | `saveBackup`, `backupState`, `isManager`, `isPrimary`, `isPrimaryOn` in `server/api.mjs` |
 | Shift card, buttons, forms | `renderScheduledShift` and `renderShift` in `index.html` |
 | Past-shift display | `loadHistory` in `index.html` |
 | Storage table | `shift_backups` in `migrations/0001_shared_storage.sql` |
@@ -174,13 +174,18 @@ History is read-only and for signed-in volunteers. For each past shift:
   `Backup: <name> covered this shift.` plus the request note.
 - Otherwise (`none`, or `needed` that was never filled): show only the primaries.
 
-Past primaries come from `schedule_versions`, not from today's volunteer records.
+Past primaries come from `schedule_versions`, not from today's volunteer records, unless a dated
+plan (`planned_shifts`) covers that date and shift, in which case its stored names are used.
 
 ## Edge cases
 
-- **Primaries are live**: for today and future dates the primaries come from the current
-  recurring schedule. If an administrator edits the recurring schedule while a request is
-  open, the card shows the new primaries.
+- **Primaries are live**: for today and future dates the primaries come from the dated plan
+  for that date and shift if one exists, otherwise from the current recurring schedule. If an
+  administrator edits the recurring schedule while a request is open, the card shows the new
+  primaries.
+- **Dated plans and requests**: a dated plan cannot be saved or removed for a date whose backup is
+  `needed` or `assigned` (409). Cancel or release the request first. `isPrimaryOn` in
+  `server/api.mjs` applies the dated plan to every backup permission check.
 - **No primaries**: only a manager can request, and the card shows the empty primary line.
 - **Deactivated volunteers**: they cannot sign in, and cannot be assigned. A name already
   stored in a request stays as written.

@@ -23,6 +23,13 @@ multiple selections or no assignment. **Save recurring schedule** saves the enti
 week to D1 and returns to the read-only table, updating the rolling schedule and
 volunteer directory. **Cancel** discards edits. Concurrent changes are rejected
 without partially saving the week. Coordinators gain assignment editing only.
+
+**Planned dates** (under the weekly table) set the primaries for one shift on specific
+dates, replacing the weekly volunteers on those dates only. Everyone can see the list;
+coordinators, admins and super-admins use **Plan dates** (shift, dates one by one or repeated
+weekly, volunteers; none means no one planned), **Edit** and **Remove**. Dates run from today
+to 90 days ahead, and a date with an open backup request cannot be changed. Details:
+[docs/workflows.md](docs/workflows.md) section 8.
 Contact information is visible to all signed-in active volunteers and hidden from signed-out visitors. Volunteer role management remains admin-only.
 
 Open `index.html` and edit the block marked `EDIT THIS SECTION TO UPDATE THE SCHEDULE`:
@@ -38,7 +45,7 @@ Open `index.html` and edit the block marked `EDIT THIS SECTION TO UPDATE THE SCH
   paragraphs; leave it empty to show "Instructions coming soon."
 
 The page shows a rolling eight-day schedule starting yesterday, based on the current date.
-Each date uses the recurring weekly plan, so the schedule updates on its own.
+Each date uses its dated plan if one exists, otherwise the recurring weekly plan, so the schedule updates on its own.
 
 ## Load updates and notes
 
@@ -77,7 +84,7 @@ Shift action buttons are hidden until sign-in. Add/Edit Notes is available only
 for yesterday and today. Backup actions are available for today and the next six days.
 The server enforces every permission below.
 
-A shift's **primaries** are its recurring assignees; they always stay on the card.
+A shift's **primaries** are its recurring assignees, or its dated plan for that date; they always stay on the card.
 Each shift also has one **Backup** slot that is either empty, needed, or assigned.
 Only the current state is kept (no backup history).
 

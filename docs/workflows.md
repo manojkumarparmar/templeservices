@@ -15,7 +15,7 @@ The site lets everyone see who is on each shift, lets volunteers report what the
 arranges cover when someone cannot serve, and lets coordinators manage the recurring weekly
 plan and the volunteer directory.
 
-Not built (do not assume these exist): volunteer-entered planned absences or multi-week
+Not built (do not assume these exist): an "effective from" date for weekly changes (they apply immediately), add/remove style dated edits (a dated plan always replaces the full list), partial backup cover, volunteer-entered planned absences or multi-week
 absence requests, a "mark my work done" button separate from notes, WhatsApp posting or share
 buttons, automatic assignment of permanent backups, and automatic data retention or deletion.
 
@@ -24,7 +24,7 @@ buttons, automatic assignment of permanent backups, and automatic data retention
 | Piece | Details |
 | --- | --- |
 | Front end | Static files: `index.html` (page script and styles), `volunteers.js`, `recurring.js`, `phone-auth.js`. No framework, no build step beyond copying files (`scripts/build.mjs` to `dist/`) |
-| API | One Cloudflare Pages Function, `functions/api/[[path]].js`, which calls `handleApi` in `server/api.mjs` (notes, schedule, backups). It delegates sign-in, the directory and the recurring schedule to `handlePeople` in `server/volunteers.mjs` |
+| API | One Cloudflare Pages Function, `functions/api/[[path]].js`, which calls `handleApi` in `server/api.mjs` (notes, schedule, backups, planned dates). It delegates sign-in, the directory and the recurring schedule to `handlePeople` in `server/volunteers.mjs` |
 | Data | Cloudflare D1 binding `DB` (all records) and private R2 binding `PHOTOS` (photo files). Photos are served only through the API |
 | Hosting | Cloudflare Pages project `templeservices`; pushing `main` deploys automatically |
 | Sign-in | Google, US mobile phone via Firebase Authentication, and email codes through Resend when configured |
@@ -59,6 +59,8 @@ under "Permanent backups").
 | Need backup, cancel need, release backup | No | No | That shift only | Any shift | Any shift | Any shift |
 | Assign a backup, reopen a backup slot | No | No | No | Yes | Yes | Yes |
 | Edit the recurring weekly schedule | No | No | No | Yes | Yes | Yes |
+| Plan, edit or remove dated primaries (Planned dates) | No | No | No | Yes | Yes | Yes |
+| See the Planned dates list and which dates are planned | List only | List only | List only | Yes (plus card tag) | Yes (plus card tag) | Yes (plus card tag) |
 | Add, edit, deactivate volunteers | No | No | No | No | Yes | Yes |
 | Edit the super-admin record | No | No | No | No | No | Yes |
 | See inactive volunteers | No | No | No | No | Yes | Yes |
@@ -112,11 +114,13 @@ The Schedule tab shows **eight days**: yesterday, today, and the next six. Each 
 Morning and an Evening card. The three main tabs (Schedule, Instructions, Volunteers) follow the
 ARIA tabs pattern with arrow, Home and End keys.
 
-- Names come from the volunteer directory: a volunteer appears on a shift when their
-  `assignments` include that weekday and shift. `WEEKLY_PLAN` in `index.html` is only a fallback
+- Names come from `GET /api/schedule`: for each date and shift, the dated plan if one exists
+  (section 8, Planned dates), otherwise the recurring plan (volunteers whose `assignments` include
+  that weekday and shift). `WEEKLY_PLAN` in `index.html` is only a fallback
   until the directory loads.
 - `GET /api/schedule?from&to` returns, for at most eight days: assignments per day and shift,
-  notes with photos, and backup states. Dates before yesterday require sign-in.
+  notes with photos, and backup states. Managers also get `planned` flags that drive a small
+  "Planned date" tag on cards. Dates before yesterday require sign-in.
 - The page refreshes every 30 seconds while visible, and again when the tab becomes visible. A new
   day triggers a full re-render. Open forms and typed drafts are never overwritten by a refresh.
 - Static, code-edited content in `index.html`: `INSTRUCTIONS` (the Instructions tab, one entry per
@@ -158,7 +162,8 @@ Each shift card has a pencil button for signed-in volunteers on **yesterday and 
 
 Summarized here, fully specified in [backup-workflow.md](backup-workflow.md):
 
-- A shift's **primaries** are its recurring assignees and always stay on the card.
+- A shift's **primaries** are its recurring assignees, or the dated plan for that date when one
+  exists (section 8), and always stay on the card.
 - **Need backup** (a primary or a manager) marks all primaries unavailable and opens one Backup
   slot. Volunteers **offer to cover**, or a manager **assigns** someone.
 - The backup can reopen the slot; **cancel need for backup** and **release backup** return the
@@ -243,7 +248,8 @@ notes with checklists and photos. Signing out clears it.
   (names, ids, assignments). Database triggers record a new version whenever a volunteer is
   inserted, deleted, or has name, assignments or active status changed. For a past date the plan is
   the latest version recorded before the end of that day (Chicago time, including daylight saving).
-  Today and future dates use the current plan.
+  Today and future dates use the current plan. A dated plan for the date (`planned_shifts`)
+  overrides the recurring plan for that shift on past dates too, using its stored names.
 - Dates before the first recorded version show "Original assignment not recorded." Never guess
   historical names from today's roster.
 - Notes older than yesterday cannot be saved or deleted. There is no correction workflow.
@@ -272,7 +278,7 @@ email address is not shown on shift cards (it still appears in places such as di
 
 Migrations (`migrations/0001` to `0007`) are already applied in production, some by direct
 `wrangler d1 execute`, so there is no reliable migrations tracking table. **Never reapply them**.
-Inspect the real schema first and add a new forward migration (`0007_...`) for any change. The
+Inspect the real schema first and add a new forward migration (`0008_...`) for any change. The
 seed in `0002` must never be run against live data.
 
 ## 13. Hosting, configuration and testing
